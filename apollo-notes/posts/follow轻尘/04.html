@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+    
+    <div class="article-copyright">
+        <svg class="icon" title="CSDN认证原创" aria-hidden="true" style="width:53px; height: 18px; vertical-align: -4px;">
+<use xlink:href="#CSDN_Cert"></use>
+</svg>
+        
+版权声明：本文为博主原创文章，未经博主允许不得转载。					https://blog.csdn.net/u013914471/article/details/83276607				</div>
+              <div id="content_views" class="markdown_views prism-atelier-sulphurpool-light">
+<!-- flowchart 箭头图标 勿删 -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;"><path stroke-linecap="round" d="M5,0 0,2.5 5,5z" id="raphael-marker-block" style="-webkit-tap-highlight-color: rgba(0, 0, 0, 0);"></path></svg>
+<p></p><div class="toc"><h3><a name="t0"></a>Apollo代码学习—Windows下编译Apollo并与Carsim和Simulink联调</h3><ul><li><a href="#_3" rel="nofollow" target="_self">郑重声明</a></li><li><a href="#_7" rel="nofollow" target="_self">前言</a></li><li><a href="#_12" rel="nofollow" target="_self">准备</a></li><ul><li><a href="#_13" rel="nofollow" target="_self">所需工具</a></li><li><a href="#_21" rel="nofollow" target="_self">安装说明</a></li><li><a href="#_26" rel="nofollow" target="_self">源码编译</a></li></ul><li><a href="#CarsimSimulink_29" rel="nofollow" target="_self">Carsim和Simulink的设置</a></li><ul><li><a href="#Carsim_32" rel="nofollow" target="_self">Carsim模型</a></li><ul><li><a href="#_49" rel="nofollow" target="_self">车模型设置</a></li><li><a href="#_73" rel="nofollow" target="_self">场景定义</a></li><ul><li><a href="#_79" rel="nofollow" target="_self">控制量定义</a></li><li><a href="#_87" rel="nofollow" target="_self">路面定义</a></li><li><a href="#_100" rel="nofollow" target="_self">障碍物设置</a></li></ul><li><a href="#Carsim_208" rel="nofollow" target="_self">Carsim输入输出设置</a></li></ul><li><a href="#Simulink_237" rel="nofollow" target="_self">Simulink模型</a></li></ul><li><a href="#Apollo_276" rel="nofollow" target="_self">Apollo编译</a></li><ul><li><a href="#_345" rel="nofollow" target="_self">依赖库</a></li><li><a href="#_454" rel="nofollow" target="_self">配置</a></li><li><a href="#_530" rel="nofollow" target="_self">测试</a></li><li><a href="#VS__Matlab_577" rel="nofollow" target="_self">VS + Matlab联调</a></li><ul><li><a href="#VS_582" rel="nofollow" target="_self">VS</a></li><li><a href="#SFunction_707" rel="nofollow" target="_self">S-Function</a></li></ul></ul><li><a href="#_914" rel="nofollow" target="_self">仿真</a></li><li><a href="#_934" rel="nofollow" target="_self">总结</a></li></ul></div><p></p>
+<h1><a name="t1"></a><a id="_3" target="_blank"></a>郑重声明</h1>
+<blockquote>
+<p>此篇文章可分享，但严禁转载。原创不易，谢谢配合。<br>
+感谢开发组的前辈对此仿真的支持与帮助。</p>
+</blockquote>
+<h1><a name="t2"></a><a id="_7" target="_blank"></a>前言</h1>
+<p>Apollo的仿真主要在Linux下进行，但由于Apollo代码主要是C++代码，按理说在配置合理的情况下，Linux和Windows下均可运行，因此在同事的协助下，在Windows平台下基于Carsim和Simulink搭建了仿真平台。此仿真是为了验证Apollo的控制模块，由于横向控制所需的部分参数未在Carsim中找到，因此未验证横向控制以及MPC，仅对纵向控制做了验证。然后基于自己的理解，写了横向PID控制，最后进行了泊车的仿真。</p>
+<p><strong>如果有人根据我的文章搭建仿真， 并验证了横向控制及MPC，欢迎讨论交流。</strong></p>
+<h1><a name="t3"></a><a id="_12" target="_blank"></a>准备</h1>
+<h2><a name="t4"></a><a id="_13" target="_blank"></a>所需工具</h2>
+<ol>
+<li>Windows平台（本人使用的是Windws 7， 32位）</li>
+<li>Carsim软件（本人使用的版本为8.02， 32位）</li>
+<li>支持Simulink的Matlab软件（本人使用的版本为2014a， 32位）</li>
+<li>Apollo源代码</li>
+<li>Python 2.x 或 3.x</li>
+<li>C++编译器（本人使用的Visual Studio 2013）</li>
+</ol>
+<h2><a name="t5"></a><a id="_21" target="_blank"></a>安装说明</h2>
+<ol>
+<li>不建议Matlab的版本过高，因为低版本的Carsim不支持与高版本的Simulink联调，Carsim8.02最高支持到2014版本的Matlab；</li>
+<li>Apollo代码中的python代码是2.x版本的，如果电脑中已安装python3.x，只需在命令行窗口中运行python3.x安装路径下Tools\scripts\中（如：D:\Program Files\Python3.5\Tools\scripts）的<code>2to3.py</code>文件即可将2.x转换为3.x标准的代码。<br>
+<code>python 2to3.py xxxx(需要转换的python文件所在路径)</code>，只需路径即可，它会自己遍历路径下所有的py文件</li>
+</ol>
+<h2><a name="t6"></a><a id="_26" target="_blank"></a>源码编译</h2>
+<p>如果要直接使用Apollo源代码，首先需要在Windows下对其进行编译，但需要根据编译提示准备很多依赖库，并预定义一些变量，此外还要对部分文件进行修改，因为Linux平台下的C++语法和Windows平台下稍有差异。这个工作量挺大，放在最后讲。</p>
+<h1><a name="t7"></a><a id="CarsimSimulink_29" target="_blank"></a>Carsim和Simulink的设置</h1>
+<p>Carsim和Simulink的设置可参考<a href="https://download.csdn.net/download/u013914471/10739948" rel="nofollow" target="_blank">龚建伟, 姜岩, 徐威. 无人驾驶车辆模型预测控制[M]. 北京理工大学出版社, 2014.</a>书中的4.3章节和附录A的内容，里面有较为详细的教程，部分细节设置部分请参考下面的教程。</p>
+<h2><a name="t8"></a><a id="Carsim_32" target="_blank"></a>Carsim模型</h2>
+<p>Carsim设置界面如下：</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181023164943549?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图1 Carsim设置界面</center>
+<p>Carsim内置了多种车辆模型，可根据所需进行选择。但在使用时有两点建议：</p>
+<ol>
+<li>
+<p>不建议在默认车模型上进行修改，因为车模型的搭建是经过严谨且详尽的计算和测量才实现的，在不清楚改动哪些参数是合理的情况下，尽量不要修改模型里的默认参数，乱改可能车模型就出问题了。因此，在搭建车模型过程中，最可靠的方法是，基于原有模型新建一个模型，以便参数设置出错时可以找回原始参数。</p>
+</li>
+<li>
+<p><strong>请不要随意点击上面工具栏中的<span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-1-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mstyle mathcolor=&quot;Red&quot;><mo>&amp;#xD7;</mo></mstyle></mrow><annotation encoding=&quot;application/x-tex&quot;>      \color{Red}&amp;#xD7;</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-1" style="width: 0.957em; display: inline-block;"><span style="display: inline-block; position: relative; width: 0.778em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.371em, 1000.63em, 4.113em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-2"><span style="display: inline-block; position: relative; width: 0.778em; height: 0px;"><span style="position: absolute; clip: rect(3.371em, 1000.63em, 4.113em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-3"><span class="mrow" id="MathJax-Span-4"><span class="mstyle" id="MathJax-Span-5" style="color: red;"><span class="mrow" id="MathJax-Span-6" style="color: red;"><span class="mo" id="MathJax-Span-7" style="font-family: MathJax_Main; color: red;">×</span></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.041em; border-left: 0px solid; width: 0px; height: 0.677em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mstyle mathcolor="Red"><mo>×</mo></mstyle></mrow><annotation encoding="application/x-tex">      \color{Red}×</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-1"><math><semantics><mrow><mstyle mathcolor="Red"><mo>×</mo></mstyle></mrow><annotation encoding="application/x-tex">\color{Red}×</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.66666em; vertical-align: -0.08333em;"></span><span class="mord" style="color: red;">×</span></span></span></span></span>，即Delete按钮，会导致删除配置文件！！！！！<br>
+请不要随意点击上面工具栏中的<span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-2-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mstyle mathcolor=&quot;Red&quot;><mo>&amp;#xD7;</mo></mstyle></mrow><annotation encoding=&quot;application/x-tex&quot;>      \color{Red}&amp;#xD7;</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-8" style="width: 0.957em; display: inline-block;"><span style="display: inline-block; position: relative; width: 0.778em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.371em, 1000.63em, 4.113em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-9"><span style="display: inline-block; position: relative; width: 0.778em; height: 0px;"><span style="position: absolute; clip: rect(3.371em, 1000.63em, 4.113em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-10"><span class="mrow" id="MathJax-Span-11"><span class="mstyle" id="MathJax-Span-12" style="color: red;"><span class="mrow" id="MathJax-Span-13" style="color: red;"><span class="mo" id="MathJax-Span-14" style="font-family: MathJax_Main; color: red;">×</span></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.041em; border-left: 0px solid; width: 0px; height: 0.677em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mstyle mathcolor="Red"><mo>×</mo></mstyle></mrow><annotation encoding="application/x-tex">      \color{Red}×</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-2"><math><semantics><mrow><mstyle mathcolor="Red"><mo>×</mo></mstyle></mrow><annotation encoding="application/x-tex">\color{Red}×</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.66666em; vertical-align: -0.08333em;"></span><span class="mord" style="color: red;">×</span></span></span></span></span>，即Delete按钮，会导致删除配置文件！！！！！<br>
+请不要随意点击上面工具栏中的<span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-3-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mstyle mathcolor=&quot;Red&quot;><mo>&amp;#xD7;</mo></mstyle></mrow><annotation encoding=&quot;application/x-tex&quot;>      \color{Red}&amp;#xD7;</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-15" style="width: 0.957em; display: inline-block;"><span style="display: inline-block; position: relative; width: 0.778em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.371em, 1000.63em, 4.113em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-16"><span style="display: inline-block; position: relative; width: 0.778em; height: 0px;"><span style="position: absolute; clip: rect(3.371em, 1000.63em, 4.113em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-17"><span class="mrow" id="MathJax-Span-18"><span class="mstyle" id="MathJax-Span-19" style="color: red;"><span class="mrow" id="MathJax-Span-20" style="color: red;"><span class="mo" id="MathJax-Span-21" style="font-family: MathJax_Main; color: red;">×</span></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.041em; border-left: 0px solid; width: 0px; height: 0.677em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mstyle mathcolor="Red"><mo>×</mo></mstyle></mrow><annotation encoding="application/x-tex">      \color{Red}×</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-3"><math><semantics><mrow><mstyle mathcolor="Red"><mo>×</mo></mstyle></mrow><annotation encoding="application/x-tex">\color{Red}×</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.66666em; vertical-align: -0.08333em;"></span><span class="mord" style="color: red;">×</span></span></span></span></span>，即Delete按钮，会导致删除配置文件！！！！！</strong><br>
+这也是为什么建议变更设置前新建模型的原因。</p>
+</li>
+</ol>
+<p>本文以搭建倒车场景为例讲解如何搭建Carsim模型，具体操作如下：</p>
+<h3><a name="t9"></a><a id="_49" target="_blank"></a>车模型设置</h3>
+<p><strong>STEP 1：</strong><br>
+按如下所示选择车辆模型，其他参数自行理解。所有默认模型初始都是锁定状态的，无法更改，在调整前请先解锁，点击右上角的锁型按钮即可解锁。调整完可再次点击锁定，避免误操作。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181023181538666?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图2 选择车辆模型</center>
+<p><strong>STEP 2：</strong><br>
+点击“B-Class， Hatchback”进入设置界面，点击“New”按钮，新建车模型，返回车辆选择界面，会发现列表中多了B-Class， Hatchback #1、B-Class， Hatchback #2、B-Class， Hatchback #3等模型，选择其中一个，开始搭建所需场景。</p>
+<div align="center"><img src="https://img-blog.csdn.net/2018102317081327?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图3 新建车辆模型</center>
+<p><strong>STEP 3：</strong><br>
+配置车辆模型，主要需要修改的就是驱动模式，我选择的为前驱模式：Front-wheel drive，还有参考点的设置。其余的像轮胎、车身基本参数等保持默认参数即可，可以自行研究参数都是干嘛用的。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181023172422687?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图4 配置车辆模型</center>
+<p>参考点的设置是为了后续和Simulink联调时获取车辆位置，一共设置了5个点，分别为左前轮、右前轮、左后轮、右后轮，以及后轴中心。或者根据自己需要自行设置参考点，参考点的设置可以参考文档，通过点击右上方的“Help”（每个设置界面都有对应的“Help”，里面有对该设置界面的详细介绍）或者顶部工具栏中的“Help”（所有的官方参考文档都可以在这里找到）获取参考文档。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181023180837546?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图5 参考点设置</center>
+<h3><a name="t10"></a><a id="_73" target="_blank"></a>场景定义</h3>
+<p>场景定义包括速度控制、刹车控制、档位控制、方向盘控制等，这些是车辆控制所必需的，也包括路面、障碍物、传感器等的设置。此处所有的设置，和最终与Simulink联调时的输入、输出有关，可根据需要自行研究说明文档进行设置。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181023182201878?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图6 场景设置</center>
+<h4><a id="_79" target="_blank"></a>控制量定义</h4>
+<p><strong>STEP 4：</strong><br>
+速度控制、刹车控制、档位控制、方向盘控制等可按照<a href="https://www.baidu.com/s?wd=%E6%88%91%E7%9A%84%E8%AE%BE%E7%BD%AE&amp;tn=24004469_oem_dg&amp;rsv_dl=gh_pl_sl_csd" target="_blank">我的设置</a>进行设置，如图6所示，速度控制中有油门控制，但我没有控制油门。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181024103538586?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图7 控制设置</center>
+<h4><a id="_87" target="_blank"></a>路面定义</h4>
+<p><strong>STEP 5：</strong><br>
+按照图8，选择3D road→Flat and Long，进入设置界面，主要关注红框区域，点击“1200m Road + 200m Light Grass”进行路面参数设置，Update Shapes用于设置完毕后更新路面参数。参数设置见图9。“View with Animator”用于显示设置完的路面状况，如图9所示。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181024100245911?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图8 道路设置</center>
+<p>路面参数设置主要关注图9中红框部分，用于设置道路宽度，以<a href="https://www.baidu.com/s?wd=%E9%81%93%E8%B7%AF%E4%B8%AD%E5%BF%83%E7%BA%BF&amp;tn=24004469_oem_dg&amp;rsv_dl=gh_pl_sl_csd" target="_blank">道路中心线</a>（白色虚线）为参考线，左右各偏移5m为单侧道路宽度，5m到6m间为白实线到马路边沿，100m为道路边草坪的宽度，可以随意设置。其他几个参数请自行查阅说明文档（点击界面右上角“？”）进行研究。参数设置完，点击Update Shapes更新道路，点击View with Animator查看道路演示画面。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181024101849807?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图9 道路定义与演示</center>
+<h4><a id="_100" target="_blank"></a>障碍物设置</h4>
+<p>因为我要验证的是控制模块，因此，感知模块由Carsim提供，同时，我要模拟停车场景，因此在场景中添加几辆不动的车辆来模拟车位，为的是便于感知车位大小和车位位置。如图10红框所示为添加障碍物车。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181024103933332?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图10 障碍物设置</center>
+<p><strong>STEP 6：</strong><br>
+三辆障碍物车的设置如图11所示，重要的是红框中障碍物坐标的定义。此处展示平行停车参数，垂直或者斜列停车参数可自行研究。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181024105338649?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图11 原始车位坐标系</center>
+<p>其中，<br>
+<strong>Lateral position</strong>为障碍物车中心线距离被控车中心线距离，单位为m；<br>
+<strong>Yaw angle offset</strong>为障碍物车起始角度，单位为rad，例如，希望障碍物车起始角度为30度，则设置为30/DR，DR为系统提供的用于角度-弧度转换的量；<br>
+<strong>S inital</strong>为车辆前轴中心横坐标，单位为m；<br>
+<strong>Length or diam</strong>为车辆轴距，不含前悬后悬，前悬后悬长度需要自己测定;</p>
+<blockquote>
+<p>测定方法:</p>
+<ol>
+<li>添加两辆车，设置一辆车初始角度为0度，另一辆为180度，调整两辆车间距离（通过调节S inital实现），使两辆车相接，即可测得后悬长度；</li>
+<li>将两辆车初始角度都设置为0度，调整两辆车间距离（通过调节S inital实现），使两辆车首尾相接，即可测得前悬长度；</li>
+<li>测定过程中，可以以0.1m为间隔调整车辆位置。</li>
+</ol>
+</blockquote>
+<p><strong>Width</strong>为车宽，但仅仅左侧轮胎外侧到右侧轮胎外侧距离，真实车宽需要自行测定，可按照上述测定前悬后悬长度的方法进行测定，只不过需要调节Lateral position而不是S inital，使两车外侧相接，注意<a href="https://www.baidu.com/s?wd=%E5%90%8E%E8%A7%86%E9%95%9C&amp;tn=24004469_oem_dg&amp;rsv_dl=gh_pl_sl_csd" target="_blank">后视镜</a>的位置，整车宽度应包含后视镜宽度。</p>
+<p>但请保持此处的<strong>Length or diam</strong>和<strong>Width</strong>不变，因为Carsim计算车辆坐标时基于此处参数计算的，如果此处改变了可能会影响后续使用。建议计算完前悬后悬、真实车宽后，以偏移量的形式写入matlab程序中，在Simulink仿真过程中将Carsim传输过来的数据进行加减操作，这点会在后文提到。</p>
+<p>红框中参数设置如下：</p>
+<pre class="prettyprint"><code class="has-numbering">// 图11上方红框两障碍物参数
+DEFINE_OUTPUT XTL1 = S_OBJ_1-LENGTH_OBJ(1)
+DEFINE_OUTPUT XTR1 = S_OBJ_1
+DEFINE_OUTPUT XBL1 = S_OBJ_1-LENGTH_OBJ(1)
+DEFINE_OUTPUT XBR1 = S_OBJ_1
+DEFINE_OUTPUT YTL1 = LatO_1+WIDTH_OBJ(1)/2
+DEFINE_OUTPUT YTR1 = LatO_1+WIDTH_OBJ(1)/2
+DEFINE_OUTPUT YBL1 = LatO_1-WIDTH_OBJ(1)/2
+DEFINE_OUTPUT YBR1 = LatO_1-WIDTH_OBJ(1)/2
+
+DEFINE_OUTPUT XTL2 = S_OBJ_2-LENGTH_OBJ(2)
+DEFINE_OUTPUT XTR2 = S_OBJ_2
+DEFINE_OUTPUT XBL2 = S_OBJ_2-LENGTH_OBJ(2)
+DEFINE_OUTPUT XBR2 = S_OBJ_2
+DEFINE_OUTPUT YTL2 = LatO_2+WIDTH_OBJ(2)/2
+DEFINE_OUTPUT YTR2 = LatO_2+WIDTH_OBJ(2)/2
+DEFINE_OUTPUT YBL2 = LatO_2-WIDTH_OBJ(2)/2
+DEFINE_OUTPUT YBR2 = LatO_2-WIDTH_OBJ(2)/2
+
+EXP_XTL1
+EXP_YTL1
+EXP_XTR1
+EXP_YTR1
+EXP_XBL1
+EXP_YBL1
+EXP_XBR1
+EXP_YBR1
+
+EXP_XTL2
+EXP_YTL2
+EXP_XTR2
+EXP_YTR2
+EXP_XBL2
+EXP_YBL2
+EXP_XBR2
+EXP_YBR2
+
+
+// 图11下方红框一障碍物参数
+DEFINE_OUTPUT XTL3 = S_OBJ_3-LENGTH_OBJ(3)
+DEFINE_OUTPUT XTR3 = S_OBJ_3
+DEFINE_OUTPUT XBL3 = S_OBJ_3-LENGTH_OBJ(3)
+DEFINE_OUTPUT XBR3 = S_OBJ_3
+DEFINE_OUTPUT YTL3 = LatO_3+WIDTH_OBJ(3)/2
+DEFINE_OUTPUT YTR3 = LatO_3+WIDTH_OBJ(3)/2
+DEFINE_OUTPUT YBL3 = LatO_3-WIDTH_OBJ(3)/2
+DEFINE_OUTPUT YBR3 = LatO_3-WIDTH_OBJ(3)/2
+
+EXP_XTL3
+EXP_YTL3
+EXP_XTR3
+EXP_YTR3
+EXP_XBL3
+EXP_YBL3
+EXP_XBR3
+EXP_YBR3
+</code><ul class="pre-numbering" style=""><li style="color: rgb(153, 153, 153);">1</li><li style="color: rgb(153, 153, 153);">2</li><li style="color: rgb(153, 153, 153);">3</li><li style="color: rgb(153, 153, 153);">4</li><li style="color: rgb(153, 153, 153);">5</li><li style="color: rgb(153, 153, 153);">6</li><li style="color: rgb(153, 153, 153);">7</li><li style="color: rgb(153, 153, 153);">8</li><li style="color: rgb(153, 153, 153);">9</li><li style="color: rgb(153, 153, 153);">10</li><li style="color: rgb(153, 153, 153);">11</li><li style="color: rgb(153, 153, 153);">12</li><li style="color: rgb(153, 153, 153);">13</li><li style="color: rgb(153, 153, 153);">14</li><li style="color: rgb(153, 153, 153);">15</li><li style="color: rgb(153, 153, 153);">16</li><li style="color: rgb(153, 153, 153);">17</li><li style="color: rgb(153, 153, 153);">18</li><li style="color: rgb(153, 153, 153);">19</li><li style="color: rgb(153, 153, 153);">20</li><li style="color: rgb(153, 153, 153);">21</li><li style="color: rgb(153, 153, 153);">22</li><li style="color: rgb(153, 153, 153);">23</li><li style="color: rgb(153, 153, 153);">24</li><li style="color: rgb(153, 153, 153);">25</li><li style="color: rgb(153, 153, 153);">26</li><li style="color: rgb(153, 153, 153);">27</li><li style="color: rgb(153, 153, 153);">28</li><li style="color: rgb(153, 153, 153);">29</li><li style="color: rgb(153, 153, 153);">30</li><li style="color: rgb(153, 153, 153);">31</li><li style="color: rgb(153, 153, 153);">32</li><li style="color: rgb(153, 153, 153);">33</li><li style="color: rgb(153, 153, 153);">34</li><li style="color: rgb(153, 153, 153);">35</li><li style="color: rgb(153, 153, 153);">36</li><li style="color: rgb(153, 153, 153);">37</li><li style="color: rgb(153, 153, 153);">38</li><li style="color: rgb(153, 153, 153);">39</li><li style="color: rgb(153, 153, 153);">40</li><li style="color: rgb(153, 153, 153);">41</li><li style="color: rgb(153, 153, 153);">42</li><li style="color: rgb(153, 153, 153);">43</li><li style="color: rgb(153, 153, 153);">44</li><li style="color: rgb(153, 153, 153);">45</li><li style="color: rgb(153, 153, 153);">46</li><li style="color: rgb(153, 153, 153);">47</li><li style="color: rgb(153, 153, 153);">48</li><li style="color: rgb(153, 153, 153);">49</li><li style="color: rgb(153, 153, 153);">50</li><li style="color: rgb(153, 153, 153);">51</li><li style="color: rgb(153, 153, 153);">52</li><li style="color: rgb(153, 153, 153);">53</li><li style="color: rgb(153, 153, 153);">54</li><li style="color: rgb(153, 153, 153);">55</li><li style="color: rgb(153, 153, 153);">56</li></ul></pre>
+<p>设置完后，被控车（1号车）以及障碍物（2、3、4号车）的相对坐标位置如图12所示，u1~u34为各车坐标，由Carsim传输至Simulink进行应用。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181024104854720?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图12 原始车位坐标系</center>
+<p>自定义变量请参考如下文档：</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181024105456433?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图13 自定义变量参考文档</center>
+<p>至此，基本场景定义完成。可返回主界面查看整体模型效果。</p>
+<p><strong>STEP 7：</strong><br>
+点击Home返回主界面，Run Control选择No linked library，然后点击Run Math Model，加载完后点击Animate，观看刚才所定义的场景，如图15所示。</p>
+<div align="center"><img src="https://img-blog.csdn.net/2018102411202341?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图14 主界面</center>
+<div align="center"><img src="https://img-blog.csdn.net/20181024112513384?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图15 演示界面</center>
+<h3><a name="t11"></a><a id="Carsim_208" target="_blank"></a>Carsim输入输出设置</h3>
+<p>Carsim与Simulink联调，肯定有输入输出，Carsim输出参数给Simulink，并接收从Simulink返回的参数输入到Carsim中，用于连续仿真。</p>
+<p><strong>STEP 7：</strong></p>
+<p>将Run Control由No linked library变更为Models: Simulink，如<a href="https://img-blog.csdn.net/20181023164943549?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" rel="nofollow" target="_blank">图1</a>所示。解决方案可选Parking或者新建解决方案，新建解决方案如<a href="https://img-blog.csdn.net/2018102317081327?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" rel="nofollow" target="_blank">图3</a>所示。</p>
+<p>Parking设置界面如图16所示：</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181024113452434?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图16 输入输出设置界面</center>
+<p><strong>set time step</strong>可设置，可不设置；<br>
+<strong>Input Channels</strong>为Carsim的输入，由Simulink传输过来；<br>
+<strong>Output Channels</strong>为Carsim的输出，输出给Simulink；<br>
+<strong>Simulnk Model</strong>为Carsim仿真所需的Simulink模型，一般为.mdl文件，当电脑系统为64为系统时，<strong>For 64-bit Windows OS</strong>会有两个选项，请选择“Use 64-bit Matlab”，32位系统只有一个选项“Use 32-bit Matlab”，无需更改。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181024114826161?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图17 Input设置界面</center>
+<p>点击Refresh，刷新界面，选择输入变量。所有的输入变量的定义可通过点击框2的 View Spreadsheet查看输入变量的定义文档。框3设置为按模块查找变量，双击框4中的变量即会添加到框5中，右键点击框4中的变量，会显示该变量的详细定义，双击框5中的序号即可删除某一变量。</p>
+<p>和输入变量的选择类似，在Output参数设置界面中，点击View Spreadsheet查看输出变量的定义文档，然后按需选择。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181024135035855?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图18 Output设置界面</center>
+<p>设置完后，返回上一届面，选择与之匹配的Simulink文件，然后返回主界面，点击<a href="https://img-blog.csdn.net/20181023164943549?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" rel="nofollow" target="_blank">图1</a>中的Send to Simulink按钮，即可将Carsim模型发送至Simulink中。若出现过未找到matlab的提示，请先启动matlab，然后再点击Send to Simulink按钮。</p>
+<h2><a name="t12"></a><a id="Simulink_237" target="_blank"></a>Simulink模型</h2>
+<p><strong>STEP 8：</strong><br>
+Simulink模型如图19、20所示，除CarSim S-Function外，其余所有模块均可在Library中找到，CarSim S-Function需要在Carsim搭建完模型，并点击Send to Simulink按钮后才会出现，具体操作见上述书本。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181024140636263?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图19 Simulink模型</center>
+<div align="center"><img src="https://img-blog.csdn.net/20181024142317710?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图20 Simulink模型</center>
+<p>模型中用到的模块有</p>
+<ul>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> Demux</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> mux</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> Constant</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> Selector</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> Memory</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> Subsystem</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> S-Function</li>
+</ul>
+<p>直接在Simulink Libray Browser中搜索即可找到对应模块，具体使用可以研究说明文档。<br>
+其中，图20中的S-function模块需要有配套的m文件，需要自己编写。可在matlab的workspace里输入edit sfuntmpl，即可调取matlab自己提供的s函数模板，以此为模板编写自己的s函数。此处不对S-function的编写进行讲解，自行查找资源，如果需求比较大的话，我再新开博文讲解。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181024144135918?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图21 查看S-function模板</center>
+<p>至此，CarSim模型和Simulink模型搭建完成，将CarSim模型xxx.cpar和Simulink模型xxx.mdl均放至CarSim安装路径下的<code>D:\Program Files\CarSim802_Prog\CarSim_Data\</code>路径下。</p>
+<ul>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> parking_in7_out56_for_control.cpar   // CarSim模型</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> parking_in56_out3_for_control.mdl    // Simulink模型</li>
+</ul>
+<p>接下来就是编写Simulink所需S-function，及<span id="jump">Apollo源码的编译与调用</span>。</p>
+<p>如果不需要使用Apollo的代码，完全可以仿照Apollo代码自写S-Function函数，实现路径规划及控制逻辑，实现自动泊车、循迹行驶等功能。本人由于未找到横向控制所需的部分参数，自写了横向控制，也同样实现了泊车入库的仿真操作。</p>
+<p>如图22所示即为仿真效果图，坐标系基于<a href="https://img-blog.csdn.net/20181024104854720?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70" rel="nofollow" target="_blank">初始坐标系</a>进行了一定的转换，黑色矩形为障碍物车，绿色框为被空车，紫色虚为被控车实际运动轨迹，紫色虚线掩盖下的黑色虚线为规划轨迹。车身最终航向偏移角度在2度以内，横纵向误差在10cm以内，控制效果基本符合需求。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181024155337163?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图22 泊车效果图</center>
+<h1><a name="t13"></a><a id="Apollo_276" target="_blank"></a>Apollo编译</h1>
+<p>源码中有一个文件：<code>WORKSPACE.in</code>，里面声明了Apollo编译所需要依赖的库：</p>
+<pre class="prettyprint"><code class="has-numbering">workspace(name = "apollo")
+
+# googletest (GTest and GMock)
+...
+
+# gflags
+...
+
+# glog
+...
+
+# Google Benchmark
+...
+
+# cpplint from google style guide
+...
+
+# eigen
+...
+
+# CivetWeb (web server)
+...
+
+# curlpp
+...
+
+#ros
+...
+
+# OpenCV 2.4.13.2
+...
+
+# PCL 1.7
+# =======
+# This requires libpcl-dev to be installed in your Ubuntu/Debian.
+...
+
+# Caffe
+...
+# YAML-CPP
+...
+
+# IpOpt
+...
+# Cuda
+...
+
+# Local-integ
+...
+
+# Proj.4
+...
+
+# tinyxml2
+...
+
+# protobuf 3.3
+...
+
+</code><ul class="pre-numbering" style=""><li style="color: rgb(153, 153, 153);">1</li><li style="color: rgb(153, 153, 153);">2</li><li style="color: rgb(153, 153, 153);">3</li><li style="color: rgb(153, 153, 153);">4</li><li style="color: rgb(153, 153, 153);">5</li><li style="color: rgb(153, 153, 153);">6</li><li style="color: rgb(153, 153, 153);">7</li><li style="color: rgb(153, 153, 153);">8</li><li style="color: rgb(153, 153, 153);">9</li><li style="color: rgb(153, 153, 153);">10</li><li style="color: rgb(153, 153, 153);">11</li><li style="color: rgb(153, 153, 153);">12</li><li style="color: rgb(153, 153, 153);">13</li><li style="color: rgb(153, 153, 153);">14</li><li style="color: rgb(153, 153, 153);">15</li><li style="color: rgb(153, 153, 153);">16</li><li style="color: rgb(153, 153, 153);">17</li><li style="color: rgb(153, 153, 153);">18</li><li style="color: rgb(153, 153, 153);">19</li><li style="color: rgb(153, 153, 153);">20</li><li style="color: rgb(153, 153, 153);">21</li><li style="color: rgb(153, 153, 153);">22</li><li style="color: rgb(153, 153, 153);">23</li><li style="color: rgb(153, 153, 153);">24</li><li style="color: rgb(153, 153, 153);">25</li><li style="color: rgb(153, 153, 153);">26</li><li style="color: rgb(153, 153, 153);">27</li><li style="color: rgb(153, 153, 153);">28</li><li style="color: rgb(153, 153, 153);">29</li><li style="color: rgb(153, 153, 153);">30</li><li style="color: rgb(153, 153, 153);">31</li><li style="color: rgb(153, 153, 153);">32</li><li style="color: rgb(153, 153, 153);">33</li><li style="color: rgb(153, 153, 153);">34</li><li style="color: rgb(153, 153, 153);">35</li><li style="color: rgb(153, 153, 153);">36</li><li style="color: rgb(153, 153, 153);">37</li><li style="color: rgb(153, 153, 153);">38</li><li style="color: rgb(153, 153, 153);">39</li><li style="color: rgb(153, 153, 153);">40</li><li style="color: rgb(153, 153, 153);">41</li><li style="color: rgb(153, 153, 153);">42</li><li style="color: rgb(153, 153, 153);">43</li><li style="color: rgb(153, 153, 153);">44</li><li style="color: rgb(153, 153, 153);">45</li><li style="color: rgb(153, 153, 153);">46</li><li style="color: rgb(153, 153, 153);">47</li><li style="color: rgb(153, 153, 153);">48</li><li style="color: rgb(153, 153, 153);">49</li><li style="color: rgb(153, 153, 153);">50</li><li style="color: rgb(153, 153, 153);">51</li><li style="color: rgb(153, 153, 153);">52</li><li style="color: rgb(153, 153, 153);">53</li><li style="color: rgb(153, 153, 153);">54</li><li style="color: rgb(153, 153, 153);">55</li><li style="color: rgb(153, 153, 153);">56</li><li style="color: rgb(153, 153, 153);">57</li><li style="color: rgb(153, 153, 153);">58</li><li style="color: rgb(153, 153, 153);">59</li></ul></pre>
+<p>在Windows上编译的时候也需要依赖库，但是并非上面的全部库，具体需要什么库可根据自己要测试的模块，在编译时提示的错误来安装依赖库。</p>
+<p>下面仅以控制模块为例讲解在Windows上编译Apollo源码。</p>
+<h2><a name="t14"></a><a id="_345" target="_blank"></a>依赖库</h2>
+<p>编译控制模块需要的依赖库大致如下所示：<a href="https://www.boost.org/" rel="nofollow" target="_blank">boost</a>、<a href="http://eigen.tuxfamily.org/index.php?title=Main_Page" rel="nofollow" target="_blank">eigen</a>、<a href="http://www.cs.ubc.ca/research/flann/#download" rel="nofollow" target="_blank">flann</a>、<a href="https://github.com/gflags/gflags" rel="nofollow" target="_blank">gflags</a>、<a href="https://github.com/google/glog" rel="nofollow" target="_blank">glog</a>、<a href="https://github.com/google/googletest" rel="nofollow" target="_blank">googletest</a>、modify、<a href="https://opencv.org/" rel="nofollow" target="_blank">opencv</a>、<a href="http://pointclouds.org/downloads/windows.html" rel="nofollow" target="_blank">PCL</a>、<a href="https://developers.google.cn/protocol-buffers/docs/downloads" rel="nofollow" target="_blank">protobuf</a>、Ros、<a href="http://www.zlib.net/" rel="nofollow" target="_blank">zlib</a>等。库版本号可以参考<code>WORKSPACE.in</code>中的说明。</p>
+<div align="center"><img src="https://img-blog.csdn.net/20181025163316345?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70"></div>
+<center>图23 依赖库</center>
+<p>安装时可以先安装<a href="http://pointclouds.org/downloads/windows.html" rel="nofollow" target="_blank">PCL</a>，因为它会自动安装依赖库，且下载界面也提供了boost、flann、eigen等的下载链接。请将上述依赖库，下载安装编译到一个自己找得到的路径下，以备后续。</p>
+<p>其中，googletest非必须，但可以用来做一些测试，推荐安装，但编译安装时不一定要下载最新版，请找合适自己操作系统和编译器的版本，如编译器为vs 2015以下的，请下载1.8.0及以下的googletest版本，同理，上述每个依赖库不一定需要最新的，要找合适自己操作系统，合适自己编译器的库。</p>
+<p>Ros可以直接<a href="https://download.csdn.net/download/u013914471/10750976" rel="nofollow" target="_blank">下载</a>（由乐哥提供）。</p>
+<p>modify为自定义文件夹，里面放的是apollo源码中的几个为了编译需要而修改过的源文件，自己在编译过程中根据错误提示自行修改吧。</p>
+<p>若上述依赖已经安装过的，可以找一下所需文件或文件夹是否存在：</p>
+<pre class="prettyprint"><code class="has-numbering"># Eigen
+|--Eigen
+|--Eigen
+|--unsupported
+|--signature_of_eigen3_matrix_library
+
+# flann
+|--flann
+|--bin
+|--include 
+|--lib
+|--share
+
+# gflags
+|--gflags
+|--bin
+|--include 
+|--lib
+
+# glog
+|--glog
+|--bin
+|--include 
+|--lib
+
+# googletest-distribution
+# 有些版本安装完后可能bin和lib下的文件都在lib文件夹下
+|--googletest-distribution
+|--bin
+|--gmock_maind.dll
+|--gmockd.dll
+|--gtest_maind.dll
+|--gtestd.dll
+|--include
+|--gmock
+|--gtest
+|--lib
+|--gmock_maind.lib
+|--gmockd.lib
+|--gtest_maind.lib
+|--gtestd.lib
+
+# opencv
+|--opencv
+|--etc
+|--include
+|--java
+|--x86
+|--LICENSE
+|--OpenCVConfig.cmake
+|--OpenCVConfig-version.cmake
+
+# PCL
+|--PCL
+|--bin
+|--cmake
+|--include 
+|--lib
+
+# protobuf
+|--protobuf
+|--bin
+|--libprotobufd.dll
+|--libprotobuf-lited.dll
+|--libprotocd.dll
+|--protoc.exe
+|--zlibd.dll
+|--cmake
+|--include 
+|--lib
+
+# ros
+|--ros
+|--bin
+|--et
+|--include 
+|--share
+|--_setup_util.py
+|--env.sh
+|--meta.txt
+|--setup.bash
+|--setup.sh
+|--setup.zsh
+|--
+
+# zlib
+|--zlib
+|--bin
+|--include 
+|--lib
+|--share
+</code><ul class="pre-numbering" style=""><li style="color: rgb(153, 153, 153);">1</li><li style="color: rgb(153, 153, 153);">2</li><li style="color: rgb(153, 153, 153);">3</li><li style="color: rgb(153, 153, 153);">4</li><li style="color: rgb(153, 153, 153);">5</li><li style="color: rgb(153, 153, 153);">6</li><li style="color: rgb(153, 153, 153);">7</li><li style="color: rgb(153, 153, 153);">8</li><li style="color: rgb(153, 153, 153);">9</li><li style="color: rgb(153, 153, 153);">10</li><li style="color: rgb(153, 153, 153);">11</li><li style="color: rgb(153, 153, 153);">12</li><li style="color: rgb(153, 153, 153);">13</li><li style="color: rgb(153, 153, 153);">14</li><li style="color: rgb(153, 153, 153);">15</li><li style="color: rgb(153, 153, 153);">16</li><li style="color: rgb(153, 153, 153);">17</li><li style="color: rgb(153, 153, 153);">18</li><li style="color: rgb(153, 153, 153);">19</li><li style="color: rgb(153, 153, 153);">20</li><li style="color: rgb(153, 153, 153);">21</li><li style="color: rgb(153, 153, 153);">22</li><li style="color: rgb(153, 153, 153);">23</li><li style="color: rgb(153, 153, 153);">24</li><li style="color: rgb(153, 153, 153);">25</li><li style="color: rgb(153, 153, 153);">26</li><li style="color: rgb(153, 153, 153);">27</li><li style="color: rgb(153, 153, 153);">28</li><li style="color: rgb(153, 153, 153);">29</li><li style="color: rgb(153, 153, 153);">30</li><li style="color: rgb(153, 153, 153);">31</li><li style="color: rgb(153, 153, 153);">32</li><li style="color: rgb(153, 153, 153);">33</li><li style="color: rgb(153, 153, 153);">34</li><li style="color: rgb(153, 153, 153);">35</li><li style="color: rgb(153, 153, 153);">36</li><li style="color: rgb(153, 153, 153);">37</li><li style="color: rgb(153, 153, 153);">38</li><li style="color: rgb(153, 153, 153);">39</li><li style="color: rgb(153, 153, 153);">40</li><li style="color: rgb(153, 153, 153);">41</li><li style="color: rgb(153, 153, 153);">42</li><li style="color: rgb(153, 153, 153);">43</li><li style="color: rgb(153, 153, 153);">44</li><li style="color: rgb(153, 153, 153);">45</li><li style="color: rgb(153, 153, 153);">46</li><li style="color: rgb(153, 153, 153);">47</li><li style="color: rgb(153, 153, 153);">48</li><li style="color: rgb(153, 153, 153);">49</li><li style="color: rgb(153, 153, 153);">50</li><li style="color: rgb(153, 153, 153);">51</li><li style="color: rgb(153, 153, 153);">52</li><li style="color: rgb(153, 153, 153);">53</li><li style="color: rgb(153, 153, 153);">54</li><li style="color: rgb(153, 153, 153);">55</li><li style="color: rgb(153, 153, 153);">56</li><li style="color: rgb(153, 153, 153);">57</li><li style="color: rgb(153, 153, 153);">58</li><li style="color: rgb(153, 153, 153);">59</li><li style="color: rgb(153, 153, 153);">60</li><li style="color: rgb(153, 153, 153);">61</li><li style="color: rgb(153, 153, 153);">62</li><li style="color: rgb(153, 153, 153);">63</li><li style="color: rgb(153, 153, 153);">64</li><li style="color: rgb(153, 153, 153);">65</li><li style="color: rgb(153, 153, 153);">66</li><li style="color: rgb(153, 153, 153);">67</li><li style="color: rgb(153, 153, 153);">68</li><li style="color: rgb(153, 153, 153);">69</li><li style="color: rgb(153, 153, 153);">70</li><li style="color: rgb(153, 153, 153);">71</li><li style="color: rgb(153, 153, 153);">72</li><li style="color: rgb(153, 153, 153);">73</li><li style="color: rgb(153, 153, 153);">74</li><li style="color: rgb(153, 153, 153);">75</li><li style="color: rgb(153, 153, 153);">76</li><li style="color: rgb(153, 153, 153);">77</li><li style="color: rgb(153, 153, 153);">78</li><li style="color: rgb(153, 153, 153);">79</li><li style="color: rgb(153, 153, 153);">80</li><li style="color: rgb(153, 153, 153);">81</li><li style="color: rgb(153, 153, 153);">82</li><li style="color: rgb(153, 153, 153);">83</li><li style="color: rgb(153, 153, 153);">84</li><li style="color: rgb(153, 153, 153);">85</li><li style="color: rgb(153, 153, 153);">86</li><li style="color: rgb(153, 153, 153);">87</li><li style="color: rgb(153, 153, 153);">88</li><li style="color: rgb(153, 153, 153);">89</li><li style="color: rgb(153, 153, 153);">90</li><li style="color: rgb(153, 153, 153);">91</li></ul></pre>
+<h2><a name="t15"></a><a id="_454" target="_blank"></a>配置</h2>
+<p>1.打开VS2013，新建一个空的控制台项目，添加源文件：<a href="http://main.cc" rel="nofollow" target="_blank">main.cc</a>，可以为其他尾缀的C++文件，但为了和Apollo保持一致，可以采用.cc尾缀。<br>
+2.项目属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-4-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-22" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-23"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-24"><span class="mrow" id="MathJax-Span-25"><span class="mo" id="MathJax-Span-26" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-4"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 配置属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-5-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-27" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-28"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-29"><span class="mrow" id="MathJax-Span-30"><span class="mo" id="MathJax-Span-31" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-5"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 调试 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-6-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-32" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-33"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-34"><span class="mrow" id="MathJax-Span-35"><span class="mo" id="MathJax-Span-36" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-6"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 工作目录：D:\Apollo2.5（自己Apollo源码所在路径）；<br>
+3.为了让VS和Matlab联调，需要在VS中添加matlab所需的文件</p>
+<blockquote>
+<p>项目属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-7-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-37" style="width: 1.251em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 123%;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="mrow" id="MathJax-Span-38"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="semantics" id="MathJax-Span-39"><span class="mrow" id="MathJax-Span-40"><span class="mo" id="MathJax-Span-41" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.073em; border-left: 0px solid; width: 0px; height: 0.76em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-7"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 配置属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-8-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-42" style="width: 1.251em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 123%;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="mrow" id="MathJax-Span-43"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="semantics" id="MathJax-Span-44"><span class="mrow" id="MathJax-Span-45"><span class="mo" id="MathJax-Span-46" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.073em; border-left: 0px solid; width: 0px; height: 0.76em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-8"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> VC++目录 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-9-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-47" style="width: 1.251em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 123%;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="mrow" id="MathJax-Span-48"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="semantics" id="MathJax-Span-49"><span class="mrow" id="MathJax-Span-50"><span class="mo" id="MathJax-Span-51" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.073em; border-left: 0px solid; width: 0px; height: 0.76em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-9"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 可执行文件目录：D:\Program Files\MATLAB\R2014a\bin\win32）；<br>
+项目属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-10-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-52" style="width: 1.251em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 123%;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="mrow" id="MathJax-Span-53"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="semantics" id="MathJax-Span-54"><span class="mrow" id="MathJax-Span-55"><span class="mo" id="MathJax-Span-56" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.073em; border-left: 0px solid; width: 0px; height: 0.76em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-10"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 配置属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-11-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-57" style="width: 1.251em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 123%;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="mrow" id="MathJax-Span-58"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="semantics" id="MathJax-Span-59"><span class="mrow" id="MathJax-Span-60"><span class="mo" id="MathJax-Span-61" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.073em; border-left: 0px solid; width: 0px; height: 0.76em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-11"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> VC++目录 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-12-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-62" style="width: 1.251em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 123%;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="mrow" id="MathJax-Span-63"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="semantics" id="MathJax-Span-64"><span class="mrow" id="MathJax-Span-65"><span class="mo" id="MathJax-Span-66" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.073em; border-left: 0px solid; width: 0px; height: 0.76em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-12"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 包含目录：D:\Program Files\MATLAB\R2014a\extern\include；<br>
+项目属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-13-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-67" style="width: 1.251em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 123%;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="mrow" id="MathJax-Span-68"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="semantics" id="MathJax-Span-69"><span class="mrow" id="MathJax-Span-70"><span class="mo" id="MathJax-Span-71" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.073em; border-left: 0px solid; width: 0px; height: 0.76em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-13"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 配置属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-14-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-72" style="width: 1.251em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 123%;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="mrow" id="MathJax-Span-73"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="semantics" id="MathJax-Span-74"><span class="mrow" id="MathJax-Span-75"><span class="mo" id="MathJax-Span-76" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.073em; border-left: 0px solid; width: 0px; height: 0.76em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-14"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> VC++目录 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-15-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-77" style="width: 1.251em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 123%;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="mrow" id="MathJax-Span-78"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.33em, 1000.94em, 4.14em, -1000em); top: -3.985em; left: 0em;"><span class="semantics" id="MathJax-Span-79"><span class="mrow" id="MathJax-Span-80"><span class="mo" id="MathJax-Span-81" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.073em; border-left: 0px solid; width: 0px; height: 0.76em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-15"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 库目录：D:\Program Files\MATLAB\R2014a\extern\lib\win32\microsoft；</p>
+</blockquote>
+<p>此步骤可以自行百度<a href="https://www.baidu.com/s?wd=vs%E8%B0%83%E7%94%A8matlab&amp;rsv_spt=1&amp;rsv_iqid=0x864d29c9000024ac&amp;issp=1&amp;f=3&amp;rsv_bp=0&amp;rsv_idx=2&amp;ie=utf-8&amp;tn=baiduhome_pg&amp;rsv_enter=1&amp;rsv_sug3=12&amp;rsv_sug1=7&amp;rsv_sug7=101&amp;rsv_sug2=1&amp;prefixsug=vs%25E8%25B0%2583%25E7%2594%25A8&amp;rsp=1&amp;inputT=5574&amp;rsv_sug4=6607" rel="nofollow" target="_blank">VS调用matlab</a>查看更详细的教程；<br>
+4. 项目属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-16-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-82" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-83"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-84"><span class="mrow" id="MathJax-Span-85"><span class="mo" id="MathJax-Span-86" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-16"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 配置属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-17-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-87" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-88"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-89"><span class="mrow" id="MathJax-Span-90"><span class="mo" id="MathJax-Span-91" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-17"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> C/C++ <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-18-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-92" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-93"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-94"><span class="mrow" id="MathJax-Span-95"><span class="mo" id="MathJax-Span-96" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-18"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 常规 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-19-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-97" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-98"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-99"><span class="mrow" id="MathJax-Span-100"><span class="mo" id="MathJax-Span-101" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-19"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 附加包含目录：</p>
+<blockquote>
+<p>D:\Program Files\MATLAB\R2014a\extern\include<br>
+E:\win_apollo\glog\include<br>
+E:\win_apollo\googletest-distribution\include<br>
+E:\win_apollo\gflags\include<br>
+E:\win_apollo\Eigen<br>
+E:\win_apollo\protobuf\include<br>
+E:\win_apollo\PCL\include\pcl-1.8<br>
+E:\win_apollo\flann\include<br>
+D:\boost<br>
+E:\Apollo2.5\apollo<br>
+E:\win_apollo\gbuddle\gbuddle<br>
+E:\win_apollo\opencv\include<br>
+E:\win_apollo\ros\include<br>
+E:\win_apollo</p>
+</blockquote>
+<p>路径可按自己实际解压或安装路径进行添加设置。其中。win-apollo是我单独创建的文件夹，用于存放依赖库和apollo调试项目。</p>
+<p>5.项目属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-20-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-102" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-103"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-104"><span class="mrow" id="MathJax-Span-105"><span class="mo" id="MathJax-Span-106" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-20"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 配置属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-21-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-107" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-108"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-109"><span class="mrow" id="MathJax-Span-110"><span class="mo" id="MathJax-Span-111" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-21"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> C/C++ <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-22-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-112" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-113"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-114"><span class="mrow" id="MathJax-Span-115"><span class="mo" id="MathJax-Span-116" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-22"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 预处理器 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-23-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-117" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-118"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-119"><span class="mrow" id="MathJax-Span-120"><span class="mo" id="MathJax-Span-121" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-23"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 预处理器定义：</p>
+<blockquote>
+<p>_CRT_SECURE_NO_WARNINGS<br>
+_SCL_SECURE_NO_WARNINGS<br>
+_USE_MATH_DEFINES<br>
+PROTOBUF_USE_DLLS<br>
+EIGEN_DONT_ALIGN_STATICALLY<br>
+BOOST_NO_CXX11_VARIADIC_TEMPLATES<br>
+GLOG_NO_ABBREVIATED_SEVERITIES<br>
+_ALLOW_KEYWORD_MACROS<br>
+constexpr=const<br>
+noexcept=<br>
+rand_r(x)=rand()<br>
+<strong>attribute</strong>(x)=</p>
+</blockquote>
+<p>这是为了编译需要，将一些Linux中的定义转换为Windows，不仅限于这些参数，在后期调试过程中，遇到一些新的无法编译或识别的符号可通过这种方法使编译通过。</p>
+<p>6.项目属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-24-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-122" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-123"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-124"><span class="mrow" id="MathJax-Span-125"><span class="mo" id="MathJax-Span-126" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-24"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 配置属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-25-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-127" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-128"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-129"><span class="mrow" id="MathJax-Span-130"><span class="mo" id="MathJax-Span-131" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-25"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 链接器 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-26-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-132" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-133"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-134"><span class="mrow" id="MathJax-Span-135"><span class="mo" id="MathJax-Span-136" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-26"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 常规 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-27-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-137" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-138"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-139"><span class="mrow" id="MathJax-Span-140"><span class="mo" id="MathJax-Span-141" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-27"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 附加库目录：</p>
+<blockquote>
+<p>D:\Program Files\MATLAB\R2014a\extern\lib<br>
+E:\win_apollo\glog\lib<br>
+E:\win_apollo\gflags\lib<br>
+E:\win_apollo\googletest-distribution\lib<br>
+D:\boost\stage\lib<br>
+E:\win_apollo\protobuf\lib<br>
+E:\win_apollo\opencv\x86\vc12\lib</p>
+</blockquote>
+<p>7.项目属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-28-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-142" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-143"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-144"><span class="mrow" id="MathJax-Span-145"><span class="mo" id="MathJax-Span-146" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-28"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 配置属性 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-29-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-147" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-148"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-149"><span class="mrow" id="MathJax-Span-150"><span class="mo" id="MathJax-Span-151" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-29"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 链接器 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-30-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-152" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-153"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-154"><span class="mrow" id="MathJax-Span-155"><span class="mo" id="MathJax-Span-156" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-30"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 输入 <span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-31-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mo>&amp;#x2192;</mo></mrow><annotation encoding=&quot;application/x-tex&quot;>      \to</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-157" style="width: 1.217em; display: inline-block;"><span style="display: inline-block; position: relative; width: 1em; height: 0px; font-size: 119%;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="mrow" id="MathJax-Span-158"><span style="display: inline-block; position: relative; width: 1em; height: 0px;"><span style="position: absolute; clip: rect(3.351em, 1000.94em, 4.133em, -1000em); top: -3.992em; left: 0em;"><span class="semantics" id="MathJax-Span-159"><span class="mrow" id="MathJax-Span-160"><span class="mo" id="MathJax-Span-161" style="font-family: MathJax_Main;">→</span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.992em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.065em; border-left: 0px solid; width: 0px; height: 0.724em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">      \to</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-31"><math><semantics><mrow><mo>→</mo></mrow><annotation encoding="application/x-tex">\to</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 0.36687em; vertical-align: 0em;"></span><span class="mrel">→</span></span></span></span></span> 附加依赖项：</p>
+<blockquote>
+<p>glogd.lib<br>
+gflags.lib<br>
+gtestd.lib<br>
+libprotobufd.lib<br>
+E:\Apollo2.5\apollo\build_vs2013\Debug\ApolloProtos.lib<br>
+libmx.lib<br>
+libmat.lib<br>
+libmex.lib<br>
+libeng.lib<br>
+opencv_core310d.lib</p>
+</blockquote>
+<p>其中，E:\Apollo2.5\apollo\build_vs2013\Debug\ApolloProtos.lib是编译apollo中所有的protbuf文件后生成的库，可以自己创建makefile文件和编译脚本编译apollo中的proto文件。</p>
+<blockquote>
+<p>CMakeLists.txt可基于<span class="katex--inline"><span class="katex"><span class="katex-mathml"><span class="MathJax_Preview" style="color: inherit; display: none;"></span><span class="MathJax" id="MathJax-Element-32-Frame" tabindex="0" style="position: relative;" data-mathml="<math xmlns=&quot;http://www.w3.org/1998/Math/MathML&quot;><semantics><mrow><mstyle mathcolor=&quot;red&quot;><mrow><mi>p</mi><mi>r</mi><mi>o</mi><mi>t</mi><mi>o</mi><mi>b</mi><mi>u</mi><mi>f</mi><mo>&amp;#x2216;</mo><mi>c</mi><mi>m</mi><mi>a</mi><mi>k</mi><mi>e</mi><mo>&amp;#x2216;</mo><mi>p</mi><mi>r</mi><mi>o</mi><mi>t</mi><mi>o</mi><mi>b</mi><mi>u</mi><mi>f</mi><mo>&amp;#x2212;</mo><mi>m</mi><mi>o</mi><mi>d</mi><mi>u</mi><mi>l</mi><mi>e</mi><mi mathvariant=&quot;normal&quot;>.</mi><mi>c</mi><mi>m</mi><mi>a</mi><mi>k</mi><mi>e</mi></mrow></mstyle></mrow><annotation encoding=&quot;application/x-tex&quot;>      \color{red}{protobuf\setminus cmake\setminus protobuf-module.cmake}</annotation></semantics></math>" role="presentation"><nobr aria-hidden="true"><span class="math" id="MathJax-Span-162" style="width: 25.257em; display: inline-block;"><span style="display: inline-block; position: relative; width: 20.492em; height: 0px; font-size: 123%;"><span style="position: absolute; clip: rect(3.136em, 1020.46em, 4.334em, -1000em); top: -3.985em; left: 0em;"><span class="mrow" id="MathJax-Span-163"><span style="display: inline-block; position: relative; width: 20.492em; height: 0px;"><span style="position: absolute; clip: rect(3.136em, 1020.46em, 4.334em, -1000em); top: -3.985em; left: 0em;"><span class="semantics" id="MathJax-Span-164"><span class="mrow" id="MathJax-Span-165"><span class="mstyle" id="MathJax-Span-166" style="color: red;"><span class="mrow" id="MathJax-Span-167" style="color: red;"><span class="mrow" id="MathJax-Span-168" style="color: red;"><span class="mi" id="MathJax-Span-169" style="font-family: MathJax_Math; font-style: italic; color: red;">p</span><span class="mi" id="MathJax-Span-170" style="font-family: MathJax_Math; font-style: italic; color: red;">r</span><span class="mi" id="MathJax-Span-171" style="font-family: MathJax_Math; font-style: italic; color: red;">o</span><span class="mi" id="MathJax-Span-172" style="font-family: MathJax_Math; font-style: italic; color: red;">t</span><span class="mi" id="MathJax-Span-173" style="font-family: MathJax_Math; font-style: italic; color: red;">o</span><span class="mi" id="MathJax-Span-174" style="font-family: MathJax_Math; font-style: italic; color: red;">b</span><span class="mi" id="MathJax-Span-175" style="font-family: MathJax_Math; font-style: italic; color: red;">u</span><span class="mi" id="MathJax-Span-176" style="font-family: MathJax_Math; font-style: italic; color: red;">f<span style="display: inline-block; overflow: hidden; height: 1px; width: 0.06em;"></span></span><span class="mo" id="MathJax-Span-177" style="font-family: MathJax_AMS; padding-left: 0.222em; color: red;">∖</span><span class="mi" id="MathJax-Span-178" style="font-family: MathJax_Math; font-style: italic; padding-left: 0.222em; color: red;">c</span><span class="mi" id="MathJax-Span-179" style="font-family: MathJax_Math; font-style: italic; color: red;">m</span><span class="mi" id="MathJax-Span-180" style="font-family: MathJax_Math; font-style: italic; color: red;">a</span><span class="mi" id="MathJax-Span-181" style="font-family: MathJax_Math; font-style: italic; color: red;">k</span><span class="mi" id="MathJax-Span-182" style="font-family: MathJax_Math; font-style: italic; color: red;">e</span><span class="mo" id="MathJax-Span-183" style="font-family: MathJax_AMS; padding-left: 0.222em; color: red;">∖</span><span class="mi" id="MathJax-Span-184" style="font-family: MathJax_Math; font-style: italic; padding-left: 0.222em; color: red;">p</span><span class="mi" id="MathJax-Span-185" style="font-family: MathJax_Math; font-style: italic; color: red;">r</span><span class="mi" id="MathJax-Span-186" style="font-family: MathJax_Math; font-style: italic; color: red;">o</span><span class="mi" id="MathJax-Span-187" style="font-family: MathJax_Math; font-style: italic; color: red;">t</span><span class="mi" id="MathJax-Span-188" style="font-family: MathJax_Math; font-style: italic; color: red;">o</span><span class="mi" id="MathJax-Span-189" style="font-family: MathJax_Math; font-style: italic; color: red;">b</span><span class="mi" id="MathJax-Span-190" style="font-family: MathJax_Math; font-style: italic; color: red;">u</span><span class="mi" id="MathJax-Span-191" style="font-family: MathJax_Math; font-style: italic; color: red;">f<span style="display: inline-block; overflow: hidden; height: 1px; width: 0.06em;"></span></span><span class="mo" id="MathJax-Span-192" style="font-family: MathJax_Main; padding-left: 0.222em; color: red;">−</span><span class="mi" id="MathJax-Span-193" style="font-family: MathJax_Math; font-style: italic; padding-left: 0.222em; color: red;">m</span><span class="mi" id="MathJax-Span-194" style="font-family: MathJax_Math; font-style: italic; color: red;">o</span><span class="mi" id="MathJax-Span-195" style="font-family: MathJax_Math; font-style: italic; color: red;">d<span style="display: inline-block; overflow: hidden; height: 1px; width: 0.003em;"></span></span><span class="mi" id="MathJax-Span-196" style="font-family: MathJax_Math; font-style: italic; color: red;">u</span><span class="mi" id="MathJax-Span-197" style="font-family: MathJax_Math; font-style: italic; color: red;">l</span><span class="mi" id="MathJax-Span-198" style="font-family: MathJax_Math; font-style: italic; color: red;">e</span><span class="mi" id="MathJax-Span-199" style="font-family: MathJax_Main; color: red;">.</span><span class="mi" id="MathJax-Span-200" style="font-family: MathJax_Math; font-style: italic; color: red;">c</span><span class="mi" id="MathJax-Span-201" style="font-family: MathJax_Math; font-style: italic; color: red;">m</span><span class="mi" id="MathJax-Span-202" style="font-family: MathJax_Math; font-style: italic; color: red;">a</span><span class="mi" id="MathJax-Span-203" style="font-family: MathJax_Math; font-style: italic; color: red;">k</span><span class="mi" id="MathJax-Span-204" style="font-family: MathJax_Math; font-style: italic; color: red;">e</span></span></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span></span><span style="display: inline-block; width: 0px; height: 3.985em;"></span></span></span><span style="display: inline-block; overflow: hidden; vertical-align: -0.311em; border-left: 0px solid; width: 0px; height: 1.237em;"></span></span></nobr><span class="MJX_Assistive_MathML" role="presentation"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mstyle mathcolor="red"><mrow><mi>p</mi><mi>r</mi><mi>o</mi><mi>t</mi><mi>o</mi><mi>b</mi><mi>u</mi><mi>f</mi><mo>∖</mo><mi>c</mi><mi>m</mi><mi>a</mi><mi>k</mi><mi>e</mi><mo>∖</mo><mi>p</mi><mi>r</mi><mi>o</mi><mi>t</mi><mi>o</mi><mi>b</mi><mi>u</mi><mi>f</mi><mo>−</mo><mi>m</mi><mi>o</mi><mi>d</mi><mi>u</mi><mi>l</mi><mi>e</mi><mi mathvariant="normal">.</mi><mi>c</mi><mi>m</mi><mi>a</mi><mi>k</mi><mi>e</mi></mrow></mstyle></mrow><annotation encoding="application/x-tex">      \color{red}{protobuf\setminus cmake\setminus protobuf-module.cmake}</annotation></semantics></math></span></span><script type="math/mml" id="MathJax-Element-32"><math><semantics><mrow><mstyle mathcolor="red"><mrow><mi>p</mi><mi>r</mi><mi>o</mi><mi>t</mi><mi>o</mi><mi>b</mi><mi>u</mi><mi>f</mi><mo>∖</mo><mi>c</mi><mi>m</mi><mi>a</mi><mi>k</mi><mi>e</mi><mo>∖</mo><mi>p</mi><mi>r</mi><mi>o</mi><mi>t</mi><mi>o</mi><mi>b</mi><mi>u</mi><mi>f</mi><mo>−</mo><mi>m</mi><mi>o</mi><mi>d</mi><mi>u</mi><mi>l</mi><mi>e</mi><mi mathvariant="normal">.</mi><mi>c</mi><mi>m</mi><mi>a</mi><mi>k</mi><mi>e</mi></mrow></mstyle></mrow><annotation encoding="application/x-tex">\color{red}{protobuf\setminus cmake\setminus protobuf-module.cmake}</annotation></semantics></math></script></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height: 1em; vertical-align: -0.25em;"></span><span class="mord" style="color: red;"><span class="mord mathit" style="color: red;">p</span><span class="mord mathit" style="margin-right: 0.02778em; color: red;">r</span><span class="mord mathit" style="color: red;">o</span><span class="mord mathit" style="color: red;">t</span><span class="mord mathit" style="color: red;">o</span><span class="mord mathit" style="color: red;">b</span><span class="mord mathit" style="color: red;">u</span><span class="mord mathit" style="margin-right: 0.10764em; color: red;">f</span><span class="mspace" style="color: red; margin-right: 0.222222em;"></span><span class="mbin" style="color: red;">∖</span><span class="mspace" style="color: red; margin-right: 0.222222em;"></span><span class="mord mathit" style="color: red;">c</span><span class="mord mathit" style="color: red;">m</span><span class="mord mathit" style="color: red;">a</span><span class="mord mathit" style="margin-right: 0.03148em; color: red;">k</span><span class="mord mathit" style="color: red;">e</span><span class="mspace" style="color: red; margin-right: 0.222222em;"></span><span class="mbin" style="color: red;">∖</span><span class="mspace" style="color: red; margin-right: 0.222222em;"></span><span class="mord mathit" style="color: red;">p</span><span class="mord mathit" style="margin-right: 0.02778em; color: red;">r</span><span class="mord mathit" style="color: red;">o</span><span class="mord mathit" style="color: red;">t</span><span class="mord mathit" style="color: red;">o</span><span class="mord mathit" style="color: red;">b</span><span class="mord mathit" style="color: red;">u</span><span class="mord mathit" style="margin-right: 0.10764em; color: red;">f</span><span class="mspace" style="color: red; margin-right: 0.222222em;"></span><span class="mbin" style="color: red;">−</span><span class="mspace" style="color: red; margin-right: 0.222222em;"></span><span class="mord mathit" style="color: red;">m</span><span class="mord mathit" style="color: red;">o</span><span class="mord mathit" style="color: red;">d</span><span class="mord mathit" style="color: red;">u</span><span class="mord mathit" style="margin-right: 0.01968em; color: red;">l</span><span class="mord mathit" style="color: red;">e</span><span class="mord" style="color: red;">.</span><span class="mord mathit" style="color: red;">c</span><span class="mord mathit" style="color: red;">m</span><span class="mord mathit" style="color: red;">a</span><span class="mord mathit" style="margin-right: 0.03148em; color: red;">k</span><span class="mord mathit" style="color: red;">e</span></span></span></span></span></span>(protobuf安装路径下)进行编写。<br>
+windows-build2013.bat为编译proto文件的脚本。</p>
+</blockquote>
+<p>将两个文件放至apollo源码根目录下，运行.bat文件，即可编译apollo中所有的protob文件，并生成一个工程。根据自己实际情况，需要变更.bat中的文件路径。</p>
+<p>上述所有路径请根据自己的实际情况配置。<br>
+至此，配置告一段落。然后写main函数，抽调Apollo代码并编译。</p>
+<h2><a name="t16"></a><a id="_530" target="_blank"></a>测试</h2>
+<p>1.编写main函数<br>
+首先利用googletest写一个测试用main函数，利用googletest框架测试apollo中的test示例：<br>
+在源文件中新建main.cc文件</p>
+<pre class="prettyprint"><code class="prism language-cpp has-numbering" onclick="mdcp.copyCode(event)"><span class="token macro property">#<span class="token directive keyword">include</span> <span class="token string">&lt;iostream&gt;</span></span>
+
+<span class="token macro property">#<span class="token directive keyword">include</span> <span class="token string">"glog/logging.h"</span></span>
+<span class="token macro property">#<span class="token directive keyword">include</span> <span class="token string">"gtest/gtest.h"</span></span>
+<span class="token macro property">#<span class="token directive keyword">include</span> <span class="token string">"gflags/gflags.h"</span></span>
+
+
+<span class="token keyword">int</span> <span class="token function">main</span><span class="token punctuation">(</span><span class="token keyword">int</span> argc<span class="token punctuation">,</span> <span class="token keyword">char</span> <span class="token operator">*</span><span class="token operator">*</span>argv<span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+google<span class="token operator">::</span><span class="token function">ParseCommandLineFlags</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>argc<span class="token punctuation">,</span> <span class="token operator">&amp;</span>argv<span class="token punctuation">,</span> <span class="token boolean">true</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+google<span class="token operator">::</span><span class="token function">InitGoogleLogging</span><span class="token punctuation">(</span>argv<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+testing<span class="token operator">::</span><span class="token function">InitGoogleTest</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>argc<span class="token punctuation">,</span> argv<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token function">RUN_ALL_TESTS</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+google<span class="token operator">::</span><span class="token function">ShutdownGoogleLogging</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+google<span class="token operator">::</span><span class="token function">ShutDownCommandLineFlags</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token keyword">return</span> <span class="token number">0</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+<div class="hljs-button" data-title="复制"></div></code><ul class="pre-numbering" style=""><li style="color: rgb(153, 153, 153);">1</li><li style="color: rgb(153, 153, 153);">2</li><li style="color: rgb(153, 153, 153);">3</li><li style="color: rgb(153, 153, 153);">4</li><li style="color: rgb(153, 153, 153);">5</li><li style="color: rgb(153, 153, 153);">6</li><li style="color: rgb(153, 153, 153);">7</li><li style="color: rgb(153, 153, 153);">8</li><li style="color: rgb(153, 153, 153);">9</li><li style="color: rgb(153, 153, 153);">10</li><li style="color: rgb(153, 153, 153);">11</li><li style="color: rgb(153, 153, 153);">12</li><li style="color: rgb(153, 153, 153);">13</li><li style="color: rgb(153, 153, 153);">14</li><li style="color: rgb(153, 153, 153);">15</li><li style="color: rgb(153, 153, 153);">16</li><li style="color: rgb(153, 153, 153);">17</li><li style="color: rgb(153, 153, 153);">18</li><li style="color: rgb(153, 153, 153);">19</li></ul></pre>
+<p>2.从Apollo总选择需要进行测试的xxxtest.cc文件加入原文件中，如下所示：</p>
+<div align="center"><img src="https://img-blog.csdnimg.cn/20181030180805764.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=,size_16,color_FFFFFF,t_70"></div>
+<center>图24 添加测试项目</center>
+<p>除了测试项目还需添加相关的文件，否则无法编译。</p>
+<div align="center"><img src="https://img-blog.csdnimg.cn/20181030181008384.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=,size_16,color_FFFFFF,t_70"></div>
+<center>图25 编译出错</center>
+<p>如图25所示，编译出错，只需找到出错原因，添加所需的文件即可编译通过。运行结果如图26所示。</p>
+<div align="center"><img src="https://img-blog.csdnimg.cn/20181030180531848.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=,size_16,color_FFFFFF,t_70"></div>
+<center>图26 测试结果</center>
+<p>当然也会出现测试不通过的情况，如图27所示，有可能文件缺失或者路径不对，或者文件格式不匹配等导致，测试窗口会有提示，具体问题具体分析，测试不通过不代表你编译有问题，找到原因即可。</p>
+<div align="center"><img src="https://img-blog.csdnimg.cn/20181030181604918.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=,size_16,color_FFFFFF,t_70"></div>
+<center>图27 测试出错</center>
+<h2><a name="t17"></a><a id="VS__Matlab_577" target="_blank"></a>VS + Matlab联调</h2>
+<p>基本测试通过之后可以着手编写c++程序了，主要是为了实现C++与Simulink的联动。</p>
+<p>在<a href="#jump" rel="nofollow" target="_self">上面</a>说过，Simulink中的S-function模块需要编写专门的m文件用于与CarSim联动。Simulink主要为CarSim提供控制模块、规划模块等，而我搭建这个模型就是为了验证Apollo的控制模块，因此，Simulink中的控制模块由Apollo提供，因此需要进行C++与Simulink的互相调用。</p>
+<h3><a name="t18"></a><a id="VS_582" target="_blank"></a>VS</h3>
+<p>使用控制模块主要需要两部分：初始化和控制量的计算，也就是需要LonController中的</p>
+<pre class="prettyprint"><code class="prism language-cpp has-numbering" onclick="mdcp.copyCode(event)"><span class="token comment">// 初始化</span>
+Status LonController<span class="token operator">::</span><span class="token function">Init</span><span class="token punctuation">(</span><span class="token keyword">const</span> ControlConf <span class="token operator">*</span>control_conf<span class="token punctuation">)</span>
+
+<span class="token comment">// 控制量计算</span>
+Status LonController<span class="token operator">::</span><span class="token function">ComputeControlCommand</span><span class="token punctuation">(</span>
+<span class="token keyword">const</span> localization<span class="token operator">::</span>LocalizationEstimate <span class="token operator">*</span>localization<span class="token punctuation">,</span>
+<span class="token keyword">const</span> canbus<span class="token operator">::</span>Chassis <span class="token operator">*</span>chassis<span class="token punctuation">,</span>
+<span class="token keyword">const</span> planning<span class="token operator">::</span>ADCTrajectory <span class="token operator">*</span>planning_published_trajectory<span class="token punctuation">,</span>
+control<span class="token operator">::</span>ControlCommand <span class="token operator">*</span>cmd<span class="token punctuation">)</span>
+<div class="hljs-button" data-title="复制"></div></code><ul class="pre-numbering" style=""><li style="color: rgb(153, 153, 153);">1</li><li style="color: rgb(153, 153, 153);">2</li><li style="color: rgb(153, 153, 153);">3</li><li style="color: rgb(153, 153, 153);">4</li><li style="color: rgb(153, 153, 153);">5</li><li style="color: rgb(153, 153, 153);">6</li><li style="color: rgb(153, 153, 153);">7</li><li style="color: rgb(153, 153, 153);">8</li><li style="color: rgb(153, 153, 153);">9</li></ul></pre>
+<p>1.定义自己的功能函数<code>mexLonControlFunc.h</code>，如下：</p>
+<pre class="prettyprint"><code class="prism language-cpp has-numbering" onclick="mdcp.copyCode(event)"><span class="token comment">// 启动初始化</span>
+<span class="token keyword">void</span> <span class="token function">InitLonControl</span><span class="token punctuation">(</span><span class="token keyword">int</span> nlhs<span class="token punctuation">,</span> mxArray <span class="token operator">*</span>plhs<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token keyword">int</span> nrhs<span class="token punctuation">,</span> mxArray <span class="token operator">*</span>prhs<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 调用控制命令计算</span>
+<span class="token keyword">void</span> <span class="token function">lonControlFunc</span><span class="token punctuation">(</span><span class="token keyword">int</span> nlhs<span class="token punctuation">,</span> mxArray<span class="token operator">*</span> plhs<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token keyword">int</span> nrhs<span class="token punctuation">,</span> mxArray<span class="token operator">*</span> prhs<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<div class="hljs-button" data-title="复制"></div></code><ul class="pre-numbering" style=""><li style="color: rgb(153, 153, 153);">1</li><li style="color: rgb(153, 153, 153);">2</li><li style="color: rgb(153, 153, 153);">3</li><li style="color: rgb(153, 153, 153);">4</li><li style="color: rgb(153, 153, 153);">5</li></ul></pre>
+<p>2.实现自己的功能函数<code>mexLonControlFunc.cc</code>，matlab与c++的数据传输请自行研究，此处不展开讨论，只讲解调用Apollo的部分。</p>
+<pre class="prettyprint"><code class="prism language-cpp has-numbering" onclick="mdcp.copyCode(event)"><span class="token comment">// 需要注意时钟的问题，默认时钟为系统时钟，</span>
+<span class="token comment">// 但为了测试方便，需要将系统时钟设置为自定义时钟</span>
+<span class="token comment">// 关于Apollo的时钟，在apollo项目的issue中我曾回答过：</span>
+<span class="token comment">// https://github.com/ApolloAuto/apollo/issues/4793#issuecomment-402073944</span>
+<span class="token comment">// 修改time.h文件</span>
+<span class="token comment">/**
+* @brief gets the current timestamp.
+* @return a Timestamp object representing the current time.
+*/</span>
+<span class="token keyword">static</span> Timestamp <span class="token function">Now</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+<span class="token keyword">switch</span> <span class="token punctuation">(</span><span class="token function">mode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+<span class="token keyword">case</span> ClockMode<span class="token operator">::</span>SYSTEM<span class="token operator">:</span>
+<span class="token keyword">return</span> <span class="token function">SystemNow</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">case</span> ClockMode<span class="token operator">::</span>MOCK<span class="token operator">:</span>
+<span class="token keyword">return</span> <span class="token function">instance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token operator">&gt;</span>mock_now_<span class="token punctuation">;</span>
+<span class="token keyword">case</span> ClockMode<span class="token operator">::</span>ROS<span class="token operator">:</span>
+<span class="token keyword">return</span> <span class="token function">instance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token operator">&gt;</span>mock_now_<span class="token punctuation">;</span>
+<span class="token keyword">default</span><span class="token operator">:</span>
+AFATAL <span class="token operator">&lt;&lt;</span> <span class="token string">"Unsupported clock mode: "</span> <span class="token operator">&lt;&lt;</span> <span class="token function">mode</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+<span class="token keyword">return</span> <span class="token function">SystemNow</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+
+<span class="token keyword">private</span><span class="token operator">:</span>
+<span class="token comment">/**
+* @brief constructs the \class Clock instance
+* @param mode the desired clock mode
+*/</span>
+<span class="token keyword">explicit</span> <span class="token function">Clock</span><span class="token punctuation">(</span>ClockMode mode<span class="token punctuation">)</span> <span class="token operator">:</span> <span class="token function">mode_</span><span class="token punctuation">(</span>mode<span class="token punctuation">)</span><span class="token punctuation">,</span> <span class="token function">mock_now_</span><span class="token punctuation">(</span><span class="token function">Timestamp</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+ros<span class="token operator">::</span>Time<span class="token operator">::</span><span class="token function">init</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span>
+<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+
+<span class="token comment">// 编写InitLonControl</span>
+<span class="token comment">// 该函数主要接收Simulink传过来的规划路径，并完成控制模块初始化</span>
+<span class="token keyword">void</span> <span class="token function">InitLonControl</span><span class="token punctuation">(</span><span class="token keyword">int</span> nlhs<span class="token punctuation">,</span> mxArray <span class="token operator">*</span>plhs<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token keyword">int</span> nrhs<span class="token punctuation">,</span> mxArray <span class="token operator">*</span>prhs<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token punctuation">{</span>	
+<span class="token comment">// 获取规划路径并存入全局变量planning_trajectory_中</span>
+<span class="token comment">// 此部分代码自行研究</span>
+<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+
+<span class="token comment">// 设置时钟</span>
+Clock<span class="token operator">::</span><span class="token function">SetMode</span><span class="token punctuation">(</span><span class="token punctuation">(</span>Clock<span class="token operator">::</span>ClockMode<span class="token punctuation">)</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>  
+std<span class="token operator">::</span>string control_conf_file <span class="token operator">=</span>
+<span class="token string">"E:/Apollo2.5/apollo/modules/control/conf/lincoln.pb.txt"</span><span class="token punctuation">;</span> 
+
+<span class="token comment">// 读取conf文件</span>
+apollo<span class="token operator">::</span>common<span class="token operator">::</span>util<span class="token operator">::</span><span class="token function">GetProtoFromFile</span><span class="token punctuation">(</span>control_conf_file<span class="token punctuation">,</span> <span class="token operator">&amp;</span>control_conf<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 纵向控制器初始化</span>
+lon_controller<span class="token punctuation">.</span><span class="token function">Init</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>control_conf<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 将初始化状态返回给Simulink</span>
+<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+<span class="token punctuation">}</span>
+
+<span class="token comment">// 编写lonControlFunc</span>
+<span class="token comment">// 该函数主要接收Simulink传过来的车辆状态信息，包含底盘信息、定位信息等，并完成纵向控制量的计算</span>
+<span class="token keyword">void</span> <span class="token function">lonControlFunc</span><span class="token punctuation">(</span><span class="token keyword">int</span> nlhs<span class="token punctuation">,</span> mxArray<span class="token operator">*</span> plhs<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">,</span> <span class="token keyword">int</span> nrhs<span class="token punctuation">,</span> mxArray<span class="token operator">*</span> prhs<span class="token punctuation">[</span><span class="token punctuation">]</span><span class="token punctuation">)</span>
+<span class="token punctuation">{</span>
+<span class="token comment">// 获取Simulink传输过来的数据</span>
+<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+
+<span class="token comment">// 更新车辆状态</span>
+<span class="token comment">// 设置时钟</span>
+<span class="token keyword">auto</span> duration <span class="token operator">=</span> apollo<span class="token operator">::</span>common<span class="token operator">::</span>time<span class="token operator">::</span><span class="token function">Duration</span><span class="token punctuation">(</span><span class="token keyword">long</span> <span class="token keyword">long</span><span class="token punctuation">(</span><span class="token punctuation">(</span>parms<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">44</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token operator">*</span>std<span class="token operator">::</span>nano<span class="token operator">::</span>den<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+Clock<span class="token operator">::</span><span class="token function">SetNow</span><span class="token punctuation">(</span>duration<span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// chassis</span>
+<span class="token keyword">auto</span> chassis_header_ <span class="token operator">=</span> chassis_<span class="token punctuation">.</span><span class="token function">mutable_header</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+chassis_header_<span class="token operator">-</span><span class="token operator">&gt;</span><span class="token function">set_timestamp_sec</span><span class="token punctuation">(</span>parms<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">44</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+chassis_header_<span class="token operator">-</span><span class="token operator">&gt;</span><span class="token function">set_module_name</span><span class="token punctuation">(</span><span class="token string">"chassis"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+chassis_header_<span class="token operator">-</span><span class="token operator">&gt;</span><span class="token function">set_sequence_num</span><span class="token punctuation">(</span>parms<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">44</span><span class="token punctuation">]</span><span class="token operator">*</span><span class="token number">100</span><span class="token operator">+</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+chassis_<span class="token punctuation">.</span><span class="token function">set_gear_location</span><span class="token punctuation">(</span><span class="token punctuation">(</span>ChassisPb<span class="token operator">::</span>GearPosition<span class="token punctuation">)</span><span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+chassis_<span class="token punctuation">.</span><span class="token function">set_speed_mps</span><span class="token punctuation">(</span>parms<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">34</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+chassis_<span class="token punctuation">.</span><span class="token function">set_brake_percentage</span><span class="token punctuation">(</span>parms<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">42</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+chassis_<span class="token punctuation">.</span><span class="token function">set_throttle_percentage</span><span class="token punctuation">(</span>parms<span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">]</span><span class="token punctuation">[</span><span class="token number">43</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token comment">// localization</span>
+<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+
+apollo<span class="token operator">::</span>common<span class="token operator">::</span>VehicleStateProvider<span class="token operator">::</span><span class="token function">instance</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">-</span><span class="token operator">&gt;</span><span class="token function">Update</span><span class="token punctuation">(</span>localization_<span class="token punctuation">,</span> chassis_<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+apollo<span class="token operator">::</span>control<span class="token operator">::</span>ControlCommand cmd<span class="token punctuation">;</span>
+<span class="token comment">// 计算控制命令</span>
+lon_controller<span class="token punctuation">.</span><span class="token function">ComputeControlCommand</span><span class="token punctuation">(</span><span class="token operator">&amp;</span>localization_<span class="token punctuation">,</span> <span class="token operator">&amp;</span>chassis_<span class="token punctuation">,</span> <span class="token operator">&amp;</span>planning_trajectory_<span class="token punctuation">,</span> <span class="token operator">&amp;</span>cmd<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// 将控制命令返回给Simulink</span>
+<span class="token punctuation">.</span><span class="token punctuation">.</span><span class="token punctuation">.</span>
+
+<div class="hljs-button" data-title="复制"></div></code><ul class="pre-numbering" style=""><li style="color: rgb(153, 153, 153);">1</li><li style="color: rgb(153, 153, 153);">2</li><li style="color: rgb(153, 153, 153);">3</li><li style="color: rgb(153, 153, 153);">4</li><li style="color: rgb(153, 153, 153);">5</li><li style="color: rgb(153, 153, 153);">6</li><li style="color: rgb(153, 153, 153);">7</li><li style="color: rgb(153, 153, 153);">8</li><li style="color: rgb(153, 153, 153);">9</li><li style="color: rgb(153, 153, 153);">10</li><li style="color: rgb(153, 153, 153);">11</li><li style="color: rgb(153, 153, 153);">12</li><li style="color: rgb(153, 153, 153);">13</li><li style="color: rgb(153, 153, 153);">14</li><li style="color: rgb(153, 153, 153);">15</li><li style="color: rgb(153, 153, 153);">16</li><li style="color: rgb(153, 153, 153);">17</li><li style="color: rgb(153, 153, 153);">18</li><li style="color: rgb(153, 153, 153);">19</li><li style="color: rgb(153, 153, 153);">20</li><li style="color: rgb(153, 153, 153);">21</li><li style="color: rgb(153, 153, 153);">22</li><li style="color: rgb(153, 153, 153);">23</li><li style="color: rgb(153, 153, 153);">24</li><li style="color: rgb(153, 153, 153);">25</li><li style="color: rgb(153, 153, 153);">26</li><li style="color: rgb(153, 153, 153);">27</li><li style="color: rgb(153, 153, 153);">28</li><li style="color: rgb(153, 153, 153);">29</li><li style="color: rgb(153, 153, 153);">30</li><li style="color: rgb(153, 153, 153);">31</li><li style="color: rgb(153, 153, 153);">32</li><li style="color: rgb(153, 153, 153);">33</li><li style="color: rgb(153, 153, 153);">34</li><li style="color: rgb(153, 153, 153);">35</li><li style="color: rgb(153, 153, 153);">36</li><li style="color: rgb(153, 153, 153);">37</li><li style="color: rgb(153, 153, 153);">38</li><li style="color: rgb(153, 153, 153);">39</li><li style="color: rgb(153, 153, 153);">40</li><li style="color: rgb(153, 153, 153);">41</li><li style="color: rgb(153, 153, 153);">42</li><li style="color: rgb(153, 153, 153);">43</li><li style="color: rgb(153, 153, 153);">44</li><li style="color: rgb(153, 153, 153);">45</li><li style="color: rgb(153, 153, 153);">46</li><li style="color: rgb(153, 153, 153);">47</li><li style="color: rgb(153, 153, 153);">48</li><li style="color: rgb(153, 153, 153);">49</li><li style="color: rgb(153, 153, 153);">50</li><li style="color: rgb(153, 153, 153);">51</li><li style="color: rgb(153, 153, 153);">52</li><li style="color: rgb(153, 153, 153);">53</li><li style="color: rgb(153, 153, 153);">54</li><li style="color: rgb(153, 153, 153);">55</li><li style="color: rgb(153, 153, 153);">56</li><li style="color: rgb(153, 153, 153);">57</li><li style="color: rgb(153, 153, 153);">58</li><li style="color: rgb(153, 153, 153);">59</li><li style="color: rgb(153, 153, 153);">60</li><li style="color: rgb(153, 153, 153);">61</li><li style="color: rgb(153, 153, 153);">62</li><li style="color: rgb(153, 153, 153);">63</li><li style="color: rgb(153, 153, 153);">64</li><li style="color: rgb(153, 153, 153);">65</li><li style="color: rgb(153, 153, 153);">66</li><li style="color: rgb(153, 153, 153);">67</li><li style="color: rgb(153, 153, 153);">68</li><li style="color: rgb(153, 153, 153);">69</li><li style="color: rgb(153, 153, 153);">70</li><li style="color: rgb(153, 153, 153);">71</li><li style="color: rgb(153, 153, 153);">72</li><li style="color: rgb(153, 153, 153);">73</li><li style="color: rgb(153, 153, 153);">74</li><li style="color: rgb(153, 153, 153);">75</li><li style="color: rgb(153, 153, 153);">76</li><li style="color: rgb(153, 153, 153);">77</li><li style="color: rgb(153, 153, 153);">78</li><li style="color: rgb(153, 153, 153);">79</li><li style="color: rgb(153, 153, 153);">80</li><li style="color: rgb(153, 153, 153);">81</li><li style="color: rgb(153, 153, 153);">82</li><li style="color: rgb(153, 153, 153);">83</li><li style="color: rgb(153, 153, 153);">84</li><li style="color: rgb(153, 153, 153);">85</li><li style="color: rgb(153, 153, 153);">86</li><li style="color: rgb(153, 153, 153);">87</li><li style="color: rgb(153, 153, 153);">88</li><li style="color: rgb(153, 153, 153);">89</li><li style="color: rgb(153, 153, 153);">90</li></ul></pre>
+<p>3.将项目编译为dll文件，并将项目运行所以来的dll文件全部拷贝至Carsim安装目录下的<code>D:\Program Files\CarSim802_Prog\CarSim_Data\</code>路径下。</p>
+<ul>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> guddle.dll</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> gflags.dll</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> glogd.dll</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> gtestd.dll</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> libprotobufd.dll</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> opencv_core310d.dll</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> zlibd.dll</li>
+</ul>
+<h3><a name="t19"></a><a id="SFunction_707" target="_blank"></a>S-Function</h3>
+<p>在matlab命令行键入<code>edit sfuntmpl</code>启动内置的s-function模板，以此为基础讲一下s-function的构成，只讲我用的到的模块。</p>
+<pre class="prettyprint"><code class="prism language-matlab has-numbering" onclick="mdcp.copyCode(event)">%=============================================================================
+% sfuntmpl可以理解为头函数吧，它定义了s-function工作的模式，名字可自定义，需和m文件名一致。
+% 其中，flag是系统定义的参数，无法人为修改，在工作循环中系统自动判断flag的值，并跳转至对应的处理函数；
+% t为时间，x不重要，我没用到，u为输入。
+%=============================================================================
+function [sys,x0,str,ts,simStateCompliance] = sfuntmpl(t,x,u,flag)
+%   The general form of an MATLAB S-function syntax is:
+%       [SYS,X0,STR,TS,SIMSTATECOMPLIANCE] = SFUNC(T,X,U,FLAG,P1,...,Pn)
+%
+%   FLAG   RESULT             DESCRIPTION
+%   -----  ------             --------------------------------------------
+%   0      [SIZES,X0,STR,TS]  Initialization, return system sizes in SYS,
+%                             initial state in X0, state ordering strings
+%                             in STR, and sample times in TS.
+%   1      DX                 Return continuous state derivatives in SYS.
+%   2      DS                 Update discrete states SYS = X(n+1)
+%   3      Y                  Return outputs in SYS.
+%   4      TNEXT              Return next time hit for variable step sample
+%                             time in SYS.
+%   5                         Reserved for future (root finding).
+%   9      []                 Termination, perform any cleanup SYS=[].
+%
+% The following outlines the general structure of an S-function.
+%
+switch flag,
+
+%%%%%%%%%%%%%%%%%%
+% Initialization %
+%%%%%%%%%%%%%%%%%%
+case 0,
+[sys,x0,str,ts,simStateCompliance]=mdlInitializeSizes;
+
+%%%%%%%%%%%
+% Outputs %
+%%%%%%%%%%%
+case 3,
+sys=mdlOutputs(t,x,u);
+
+// 对于无用的flag可以作如下处理，也可以不做处理
+case {1,2,4,5} % Unused flags
+sys = [];
+
+%%%%%%%%%%%%%
+% Terminate %
+%%%%%%%%%%%%%
+case 9,
+sys=mdlTerminate(t,x,u);
+
+%%%%%%%%%%%%%%%%%%%%
+% Unexpected flags %
+%%%%%%%%%%%%%%%%%%%%
+otherwise
+DAStudio.error('Simulink:blocks:unhandledFlag', num2str(flag));
+
+end
+
+% end sfuntmpl
+
+% 初始化函数
+%=============================================================================
+% mdlInitializeSizes
+% Return the sizes, initial conditions, and sample times for the S-function.
+%=============================================================================
+%
+function [sys,x0,str,ts,simStateCompliance]=mdlInitializeSizes
+
+%
+% call simsizes for a sizes structure, fill it in and convert it to a
+% sizes array.
+%
+% Note that in this example, the values are hard coded.  This is not a
+% recommended practice as the characteristics of the block are typically
+% defined by the S-function parameters.
+%
+sizes = simsizes;
+
+sizes.NumContStates  = 0;
+sizes.NumDiscStates  = 0;
+sizes.NumOutputs     = 0;    // 输出参数个数
+sizes.NumInputs      = 0;    // 输入参数个数
+sizes.DirFeedthrough = 1;
+sizes.NumSampleTimes = 1;   % at least one sample time is needed
+
+sys = simsizes(sizes);
+
+%
+% initialize the initial conditions
+%
+x0  = [];
+
+%
+% str is always an empty matrix
+%
+str = [];
+
+%
+% initialize the array of sample times
+%
+ts  = [0 0];  % sample time: [period, offset]，如果采样间隔为0.01s，则设置ts=[0.01 0];        
+% end mdlInitializeSizes
+
+% s-function中的主要部分，用于计算输出，函数内部自定义
+%=============================================================================
+% mdlOutputs
+% Return the block outputs.
+%=============================================================================
+%
+function sys=mdlOutputs(t,x,u)
+
+sys = [];  %sys是计算输出的内容，可将[]替换为你在该步的计算结果
+
+% end mdlOutputs
+
+%
+%=============================================================================
+
+
+%终止函数，仿真结束会自动调用该函数
+%无论是仿真时间到了还是中途退出，均会调用该函数），可以做一些数据处理、生成图表之类的操作，视需求而定
+%=============================================================================
+% mdlTerminate
+% Perform any end of simulation tasks.
+%=============================================================================
+%
+function sys=mdlTerminate(t,x,u)
+
+sys = []; %程序已终结，返回[]即可，此处不用给sys赋值
+
+% end mdlTerminate
+
+<div class="hljs-button" data-title="复制"></div></code><ul class="pre-numbering" style=""><li style="color: rgb(153, 153, 153);">1</li><li style="color: rgb(153, 153, 153);">2</li><li style="color: rgb(153, 153, 153);">3</li><li style="color: rgb(153, 153, 153);">4</li><li style="color: rgb(153, 153, 153);">5</li><li style="color: rgb(153, 153, 153);">6</li><li style="color: rgb(153, 153, 153);">7</li><li style="color: rgb(153, 153, 153);">8</li><li style="color: rgb(153, 153, 153);">9</li><li style="color: rgb(153, 153, 153);">10</li><li style="color: rgb(153, 153, 153);">11</li><li style="color: rgb(153, 153, 153);">12</li><li style="color: rgb(153, 153, 153);">13</li><li style="color: rgb(153, 153, 153);">14</li><li style="color: rgb(153, 153, 153);">15</li><li style="color: rgb(153, 153, 153);">16</li><li style="color: rgb(153, 153, 153);">17</li><li style="color: rgb(153, 153, 153);">18</li><li style="color: rgb(153, 153, 153);">19</li><li style="color: rgb(153, 153, 153);">20</li><li style="color: rgb(153, 153, 153);">21</li><li style="color: rgb(153, 153, 153);">22</li><li style="color: rgb(153, 153, 153);">23</li><li style="color: rgb(153, 153, 153);">24</li><li style="color: rgb(153, 153, 153);">25</li><li style="color: rgb(153, 153, 153);">26</li><li style="color: rgb(153, 153, 153);">27</li><li style="color: rgb(153, 153, 153);">28</li><li style="color: rgb(153, 153, 153);">29</li><li style="color: rgb(153, 153, 153);">30</li><li style="color: rgb(153, 153, 153);">31</li><li style="color: rgb(153, 153, 153);">32</li><li style="color: rgb(153, 153, 153);">33</li><li style="color: rgb(153, 153, 153);">34</li><li style="color: rgb(153, 153, 153);">35</li><li style="color: rgb(153, 153, 153);">36</li><li style="color: rgb(153, 153, 153);">37</li><li style="color: rgb(153, 153, 153);">38</li><li style="color: rgb(153, 153, 153);">39</li><li style="color: rgb(153, 153, 153);">40</li><li style="color: rgb(153, 153, 153);">41</li><li style="color: rgb(153, 153, 153);">42</li><li style="color: rgb(153, 153, 153);">43</li><li style="color: rgb(153, 153, 153);">44</li><li style="color: rgb(153, 153, 153);">45</li><li style="color: rgb(153, 153, 153);">46</li><li style="color: rgb(153, 153, 153);">47</li><li style="color: rgb(153, 153, 153);">48</li><li style="color: rgb(153, 153, 153);">49</li><li style="color: rgb(153, 153, 153);">50</li><li style="color: rgb(153, 153, 153);">51</li><li style="color: rgb(153, 153, 153);">52</li><li style="color: rgb(153, 153, 153);">53</li><li style="color: rgb(153, 153, 153);">54</li><li style="color: rgb(153, 153, 153);">55</li><li style="color: rgb(153, 153, 153);">56</li><li style="color: rgb(153, 153, 153);">57</li><li style="color: rgb(153, 153, 153);">58</li><li style="color: rgb(153, 153, 153);">59</li><li style="color: rgb(153, 153, 153);">60</li><li style="color: rgb(153, 153, 153);">61</li><li style="color: rgb(153, 153, 153);">62</li><li style="color: rgb(153, 153, 153);">63</li><li style="color: rgb(153, 153, 153);">64</li><li style="color: rgb(153, 153, 153);">65</li><li style="color: rgb(153, 153, 153);">66</li><li style="color: rgb(153, 153, 153);">67</li><li style="color: rgb(153, 153, 153);">68</li><li style="color: rgb(153, 153, 153);">69</li><li style="color: rgb(153, 153, 153);">70</li><li style="color: rgb(153, 153, 153);">71</li><li style="color: rgb(153, 153, 153);">72</li><li style="color: rgb(153, 153, 153);">73</li><li style="color: rgb(153, 153, 153);">74</li><li style="color: rgb(153, 153, 153);">75</li><li style="color: rgb(153, 153, 153);">76</li><li style="color: rgb(153, 153, 153);">77</li><li style="color: rgb(153, 153, 153);">78</li><li style="color: rgb(153, 153, 153);">79</li><li style="color: rgb(153, 153, 153);">80</li><li style="color: rgb(153, 153, 153);">81</li><li style="color: rgb(153, 153, 153);">82</li><li style="color: rgb(153, 153, 153);">83</li><li style="color: rgb(153, 153, 153);">84</li><li style="color: rgb(153, 153, 153);">85</li><li style="color: rgb(153, 153, 153);">86</li><li style="color: rgb(153, 153, 153);">87</li><li style="color: rgb(153, 153, 153);">88</li><li style="color: rgb(153, 153, 153);">89</li><li style="color: rgb(153, 153, 153);">90</li><li style="color: rgb(153, 153, 153);">91</li><li style="color: rgb(153, 153, 153);">92</li><li style="color: rgb(153, 153, 153);">93</li><li style="color: rgb(153, 153, 153);">94</li><li style="color: rgb(153, 153, 153);">95</li><li style="color: rgb(153, 153, 153);">96</li><li style="color: rgb(153, 153, 153);">97</li><li style="color: rgb(153, 153, 153);">98</li><li style="color: rgb(153, 153, 153);">99</li><li style="color: rgb(153, 153, 153);">100</li><li style="color: rgb(153, 153, 153);">101</li><li style="color: rgb(153, 153, 153);">102</li><li style="color: rgb(153, 153, 153);">103</li><li style="color: rgb(153, 153, 153);">104</li><li style="color: rgb(153, 153, 153);">105</li><li style="color: rgb(153, 153, 153);">106</li><li style="color: rgb(153, 153, 153);">107</li><li style="color: rgb(153, 153, 153);">108</li><li style="color: rgb(153, 153, 153);">109</li><li style="color: rgb(153, 153, 153);">110</li><li style="color: rgb(153, 153, 153);">111</li><li style="color: rgb(153, 153, 153);">112</li><li style="color: rgb(153, 153, 153);">113</li><li style="color: rgb(153, 153, 153);">114</li><li style="color: rgb(153, 153, 153);">115</li><li style="color: rgb(153, 153, 153);">116</li><li style="color: rgb(153, 153, 153);">117</li><li style="color: rgb(153, 153, 153);">118</li><li style="color: rgb(153, 153, 153);">119</li><li style="color: rgb(153, 153, 153);">120</li><li style="color: rgb(153, 153, 153);">121</li><li style="color: rgb(153, 153, 153);">122</li><li style="color: rgb(153, 153, 153);">123</li><li style="color: rgb(153, 153, 153);">124</li><li style="color: rgb(153, 153, 153);">125</li><li style="color: rgb(153, 153, 153);">126</li><li style="color: rgb(153, 153, 153);">127</li><li style="color: rgb(153, 153, 153);">128</li><li style="color: rgb(153, 153, 153);">129</li><li style="color: rgb(153, 153, 153);">130</li></ul></pre>
+<p>Simulink和VS联调有多种方法，我通过加载dll文件的方式实现。</p>
+<p>1.S-function初始化时要加载c++模块，在仿真结束时要卸载c++模块。</p>
+<pre class="prettyprint"><code class="prism language-matlab has-numbering" onclick="mdcp.copyCode(event)">% 加载c++模块
+% gbuddle为项目编译生成的dll文件
+% 若gbuddle已加载，判断m中接口是否正确
+if libisloaded('gbuddle')
+m = libfunctions('gbuddle','-full');
+if size(m,1)&lt;2
+[notfound, warnings]=loadlibrary('gbuddle','mexLonControlFunc.h');
+end
+else
+[notfound, warnings]=loadlibrary('gbuddle','mexLonControlFunc.h');
+end
+
+% 卸载c++模块
+if libisloaded('gbuddle')
+unloadlibrary('gbuddle')
+end
+<div class="hljs-button" data-title="复制"></div></code><ul class="pre-numbering" style=""><li style="color: rgb(153, 153, 153);">1</li><li style="color: rgb(153, 153, 153);">2</li><li style="color: rgb(153, 153, 153);">3</li><li style="color: rgb(153, 153, 153);">4</li><li style="color: rgb(153, 153, 153);">5</li><li style="color: rgb(153, 153, 153);">6</li><li style="color: rgb(153, 153, 153);">7</li><li style="color: rgb(153, 153, 153);">8</li><li style="color: rgb(153, 153, 153);">9</li><li style="color: rgb(153, 153, 153);">10</li><li style="color: rgb(153, 153, 153);">11</li><li style="color: rgb(153, 153, 153);">12</li><li style="color: rgb(153, 153, 153);">13</li><li style="color: rgb(153, 153, 153);">14</li><li style="color: rgb(153, 153, 153);">15</li><li style="color: rgb(153, 153, 153);">16</li></ul></pre>
+<p>由于S-function在程序运行过程中无法查看vs里面的运行情况，所以请提前确认vs代码没有问题，或者输出一些必要的信息，以确认自己计算的结果是否正确。</p>
+<p>2.编写功能函数<br>
+我的S-function函数的工作流程大致如图28所示，主要包含了初始化函数、output函数、终止函数。</p>
+<div align="center"><img src="https://img-blog.csdnimg.cn/20181031141959642.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=,size_16,color_FFFFFF,t_70"></div>
+<center>图28 S-function流程图</center>
+<p>提供一种将matlab数据存储为csv文件的方法</p>
+<pre class="prettyprint"><code class="prism language-matlab has-numbering" onclick="mdcp.copyCode(event)">filePath = 'D:\Program Files\CarSim802_Prog\CarSim_Data\control_data.csv';
+fileTile={'x_station_error','y_station_error','station_pid_input','station_pid_output','speed_error','speed_error_act','speed_pid_input','speed_pid_output','preview_acceleration_reference','calibTable_input_speed','calibTable_input_acc','calibTable_output_break'};
+
+% 存文件，实际值与规划值之差
+controlCell=num2cell(control_table);
+controlData=cell2table(controlCell,'VariableNames',fileTile);
+writetable(controlData,filePath)
+<div class="hljs-button" data-title="复制"></div></code><ul class="pre-numbering" style=""><li style="color: rgb(153, 153, 153);">1</li><li style="color: rgb(153, 153, 153);">2</li><li style="color: rgb(153, 153, 153);">3</li><li style="color: rgb(153, 153, 153);">4</li><li style="color: rgb(153, 153, 153);">5</li><li style="color: rgb(153, 153, 153);">6</li><li style="color: rgb(153, 153, 153);">7</li></ul></pre>
+<p>若要在同一文件下继续写数据，则用以下方法：</p>
+<pre class="prettyprint"><code class="prism language-matlab has-numbering" onclick="mdcp.copyCode(event)">filePath = 'D:\Program Files\CarSim802_Prog\CarSim_Data\control_data.csv';
+dlmwrite(filePath,control_table,'-append')
+<div class="hljs-button" data-title="复制"></div></code><ul class="pre-numbering" style=""><li style="color: rgb(153, 153, 153);">1</li><li style="color: rgb(153, 153, 153);">2</li></ul></pre>
+<p>存储单个图片</p>
+<pre class="prettyprint"><code class="prism language-matlab has-numbering" onclick="mdcp.copyCode(event)">figure(1)
+plot(t,x,'*k')
+xlabel('T/ s')
+ylabel('X/ m')
+saveas(gcf,'t-station_error.png')
+<div class="hljs-button" data-title="复制"></div></code><ul class="pre-numbering" style=""><li style="color: rgb(153, 153, 153);">1</li><li style="color: rgb(153, 153, 153);">2</li><li style="color: rgb(153, 153, 153);">3</li><li style="color: rgb(153, 153, 153);">4</li><li style="color: rgb(153, 153, 153);">5</li></ul></pre>
+<p>最终将写好的S-function文件另存为MY_Parking_apollo.m，并放至<code>D:\Program Files\CarSim802_Prog\CarSim_Data\</code>下，便于查找。</p>
+<p>至此，仿真所需的前期准备全部完成。<code>D:\Program Files\CarSim802_Prog\CarSim_Data\</code>路径下的文件有：</p>
+<ul>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> guddle.dll</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> gflags.dll</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> glogd.dll</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> gtestd.dll</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> libprotobufd.dll</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> opencv_core310d.dll</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> zlibd.dll</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> parking_in7_out56_for_control.cpar // CarSim模型</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> parking_in56_out3_for_control.mdl // Simulink模型</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> MY_Parking_apollo.m // S-function</li>
+<li class="task-list-item"><input type="checkbox" class="task-list-item-checkbox" checked="true" disabled=""> mexLonControlFunc.h //C++头文件</li>
+</ul>
+<h1><a name="t20"></a><a id="_914" target="_blank"></a>仿真</h1>
+<p><a href="https://www.baidu.com/s?wd=%E4%B8%87%E4%BA%8B%E4%BF%B1%E5%A4%87&amp;tn=24004469_oem_dg&amp;rsv_dl=gh_pl_sl_csd" target="_blank">万事俱备</a>，开始仿真。<br>
+<strong>STEP 1</strong><br>
+启动CarSim，加载根据自己需求搭建的CarSim模型，设置好输入输出，点击Send to Simulink；</p>
+<div align="center"><img src="https://img-blog.csdnimg.cn/20181031143931559.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=,size_16,color_FFFFFF,t_70"></div>
+<center>图29 启动CarSim</center>
+<p><strong>STEP 2</strong><br>
+Simulink启动，设置Simulink解释器及仿真时间。</p>
+<div align="center"><img src="https://img-blog.csdnimg.cn/20181031145218281.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=,size_16,color_FFFFFF,t_70"></div>
+<center>图30 启动Simulink</center>
+<p>选择S-function文件</p>
+<div align="center"><img src="https://img-blog.csdnimg.cn/20181031145352797.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3UwMTM5MTQ0NzE=,size_16,color_FFFFFF,t_70"></div>
+<center>图31 选择S-function文件</center>
+<p>然后，开始你的仿真吧。可以将仿真过程中的数据存下来便于后期分析。</p>
+<h1><a name="t21"></a><a id="_934" target="_blank"></a>总结</h1>
+<p>总算写完了。因为代码不能完全公开，所以部分地方写的不算详尽，详细写可能这篇博文得拆分成四五篇写，但上面写的差不多涵盖了所有应该注意的点，有问题可以交流。如果内容中有不对或不妥的地方欢迎指正。</p>
+
+</div>
+<link href="https://csdnimg.cn/release/phoenix/mdeditor/markdown_views-7b4cdcb592.css" rel="stylesheet">
+
+</body>
+</html>
