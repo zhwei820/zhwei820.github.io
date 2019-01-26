@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+    
+    <link rel="stylesheet" href="https://csdnimg.cn/release/phoenix/template/css/ck_htmledit_views-f1a9c33fcd.css">
+    <div class="htmledit_views" id="content_views">
+<p>在之前的文章<a href="https://www.jianshu.com/p/51ec2d87b5f3" rel="nofollow" target="_blank">《线性代数之矩阵》</a>中已经介绍了一些关于矩阵的基本概念，本篇文章主要就求解逆矩阵进行进一步总结。</p>
+
+<h3><a name="t0"></a>余子式(Minor)</h3>
+
+<p>我们先看例子来直观的理解什么是余子式(Minor，后边将都用英文Minor，中文的翻译较乱）。</p>
+
+<p><img alt="" class="has" src="https://img-blog.csdnimg.cn/20181115135502854.png" width="201" height="79"></p>
+
+<p>minor example</p>
+
+<p><br>
+这个例子（我们假设矩阵为A）中我们看到A[1,1]的minor就是将A[1,1]所在的行和列删除后剩下的矩阵的<strong>行列式</strong>，假设我们把A[1,1]的minor记作M[1,1], 在这个例子中就是</p>
+
+<p><img alt="" class="has" src="https://img-blog.csdnimg.cn/20181115135533711.png" width="281" height="54"></p>
+
+<p>M1,1</p>
+
+<p>同样道理A[i, j]的minor就是去掉第i行和第j列剩下的矩阵的行列式。</p>
+
+<h3><a name="t1"></a>Matrix of Minors</h3>
+
+<p>我们现在已经知道如何求解某个元素的minor了，现在将某个矩阵所有元素的minors求解出来，得出一个新的矩阵就叫matrix of minors，如下图所示就是我们示例中矩阵A的minor矩阵</p>
+
+<p><img alt="" class="has" src="https://img-blog.csdnimg.cn/20181115135552438.png" width="324" height="86"></p>
+
+<p>minors of A</p>
+
+<h3><a name="t2"></a>Matrix of Cofactors</h3>
+
+<p>首先要介绍Cofactor，我们把M[i,j]的cofactor记作C[i,j]，我们可以有如下公式:</p>
+
+<p><img alt="" class="has" src="https://img-blog.csdnimg.cn/20181115135603694.png" width="135" height="35"></p>
+
+<p>cofactor</p>
+
+<p>&nbsp;</p>
+
+<p>通过这个计算公式，我们可以得到所有的M对应的C，这样也组成了一个矩阵，这就是matrix of cofactors，还以我们上边的例子来看下如何得到的matrix of cofactors，记作C</p>
+
+<p><img alt="" class="has" src="https://img-blog.csdnimg.cn/20181115135616901.png" width="476" height="79"></p>
+
+<p>matrix of cofactors</p>
+
+<p>&nbsp;</p>
+
+<p>当我们有了matrix of cofactors之后，我们就可以计算A的行列式了|A|，计算过程是用A的第一行的数值A[1,j]乘以相对应的cofactorC[1,j]，然后将结果相加</p>
+
+<pre class="has" name="code" onclick="hljs.copyCode(event)"><code class="hljs ruby"><span class="hljs-params">|A|</span> = <span class="hljs-number">1</span>x(-<span class="hljs-number">3</span>) + <span class="hljs-number">2</span>x6 + <span class="hljs-number">3</span>x(-<span class="hljs-number">3</span>)=<span class="hljs-number">0</span>
+</code><div class="hljs-button" data-title="复制"></div></pre>
+
+<p>当|A|=0时，我们就称A为奇异矩阵，若|A|!=0，我们就称A为非奇异矩阵。奇异矩阵是没有逆矩阵的。最后我想说的是我本来想求逆矩阵的，不凑巧找了个奇异矩阵，饶恕我吧:(</p>
+
+<h3><a name="t3"></a>伴随矩阵 Adjugate Matrix</h3>
+
+<p>伴随矩阵是将matrix of cofactors进行转置(transpose)之后得到的矩阵，我们称作A的伴随矩阵，记作adj(A)。所谓转置就是将[i,j]的值与[j,i]的值进行互换，具体到我们的例子如下：</p>
+
+<p><img alt="" class="has" src="https://img-blog.csdnimg.cn/20181115135629697.png" width="501" height="79"></p>
+
+<p>adjugate matrix</p>
+
+<p>注：这个例子不太明显，实际上交换了所有C[i,j]与C[j,i]的值，比如C[2,3]和C[3,2]</p>
+
+<p>由于本篇文章的例子A是一个奇异矩阵，因此没有逆矩阵，但如果是非奇异矩阵，我们则可以按照之前的公式求得逆矩阵。</p>
+
+<p>&nbsp;</p>
+
+<p><img alt="" class="has" src="https://img-blog.csdnimg.cn/20181115135643158.png" width="156" height="60"></p>
+
+<p>逆矩阵计算</p>
+
+<h3><a name="t4"></a>初等变换</h3>
+
+<p>求解逆矩阵除了上面的方法外，还可以用更加直观的方法进行求解，这就是初等变换，其原理就是根据A乘以A的逆等于单位矩阵I这个原理，感兴趣的同学可以看参考链接中的视频。</p>
+
+<p>参考：</p>
+
+<p>1，<a href="https://link.jianshu.com?t=http://open.163.com/special/Khan/linearalgebra.html" rel="nofollow" target="_blank">可汗公开课</a><br>
+2，<a href="https://link.jianshu.com?t=https://en.wikipedia.org/wiki/Minor_(linear_algebra)" rel="nofollow" target="_blank">minor introduction in wikipedia</a><br>
+3，<a href="https://link.jianshu.com?t=http://www.qiujiawei.com/" rel="nofollow" target="_blank">Wyman的技术博客</a></p>            </div>
+
+</body>
+</html>
